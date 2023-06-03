@@ -26,6 +26,7 @@ logging.basicConfig(level=logging.DEBUG,
 # 5 - Try different optimizers
 # 6 - Model.eval()? We are not using it now.
 # 7 - try layer norm layers
+# 8 - Understand why l2 normalization completely fails
 
 EPOCHS = 1000000
 ITERATIONS = 10
@@ -948,7 +949,6 @@ if __name__ == "__main__":
 
     # Generate train data.
     train_loader, test_loader = MNIST_loaders()
-    # TODO: put this on the device initially?
     x, y_pos = next(iter(train_loader))
     x, y_pos = x.to(device), y_pos.to(device)
     train_batch_size = len(x)
