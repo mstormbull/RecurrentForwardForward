@@ -15,9 +15,6 @@ import wandb
 logging.basicConfig(level=logging.DEBUG,
                     format='%(asctime)s - %(levelname)s - %(message)s')
 
-# QUESTIONS:
-# 1 - First layer activations get very sparse?
-
 # TODO:
 # 1 - Implement side connections as shown in Fig3
 # 2 - Experiment with more layers
@@ -497,9 +494,9 @@ class RecurrentFFNet(nn.Module):
         Args:
             mode (ForwardMode): An enum representing the mode of forward
             propagation. This could be PositiveData, NegativeData, or
-            PredictData. input_data
+            PredictData.
 
-            (torch.Tensor): The input data for the
+            input_data (torch.Tensor): The input data for the
             network.
 
             label_data (torch.Tensor): The target labels for the
@@ -566,7 +563,6 @@ class HiddenLayer(nn.Module):
         self.predict_activations = None
         self.reset_activations(True)
 
-        # TODO: weight ordering?
         self.forward_linear = nn.Linear(prev_size, size)
         self.backward_linear = nn.Linear(size, prev_size)
 
