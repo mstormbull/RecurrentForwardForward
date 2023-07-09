@@ -3,3 +3,6 @@
 data
 wandb
 env
+__pycache__
+*.egg-info
+env-*

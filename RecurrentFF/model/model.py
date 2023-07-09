@@ -12,50 +12,14 @@ from torchvision.transforms import Compose, ToTensor, Normalize, Lambda
 import torchviz
 import wandb
 
-logging.basicConfig(level=logging.DEBUG,
-                    format='%(asctime)s - %(levelname)s - %(message)s')
+from RecurrentFF.model.constants import EPSILON, DAMPING_FACTOR, ITERATIONS, LEARNING_RATE, EPOCHS, THRESHOLD, DEVICE
 
 # TODO:
-# 1 - Implement side connections as shown in Fig3
-# 2 - Experiment with more layers
-# 3 - Experiment with weight initialization
-# 4 - Stop using nn.Linear if all we need are simple weights
-# 5 - Try different optimizers
-# 6 - Model.eval()? We are not using it now.
-# 7 - try layer norm layers
-# 8 - Understand why l2 normalization completely fails
-
-EPOCHS = 1000000
-ITERATIONS = 10
-THRESHOLD = 1
-DAMPING_FACTOR = 0.7
-EPSILON = 1e-8
-LEARNING_RATE = 0.00005
-LAYERS = [200, 200, 200]
-
-INPUT_SIZE = 784
-NUM_CLASSES = 10
-
-
-def MNIST_loaders(train_batch_size=50000, test_batch_size=10000):
-    transform = Compose([
-        ToTensor(),
-        Normalize((0.1307,), (0.3081,)),
-        Lambda(lambda x: torch.flatten(x))])
-
-    train_loader = DataLoader(
-        MNIST('./data/', train=True,
-              download=True,
-              transform=transform),
-        batch_size=train_batch_size, shuffle=True)
-
-    test_loader = DataLoader(
-        MNIST('./data/', train=False,
-              download=True,
-              transform=transform),
-        batch_size=test_batch_size, shuffle=False)
-
-    return train_loader, test_loader
+# 1 - Experiment with more layers
+# 2 - Experiment with weight initialization
+# 3 - Try different optimizers
+# 4 - Try layer norm layers
+# 5 - Understand why l2 normalization completely fails
 
 
 def standardize_layer_activations(layer_activations):
@@ -222,6 +186,7 @@ class RecurrentFFNet(nn.Module):
         logging.info("initializing network")
         super(RecurrentFFNet, self).__init__()
 
+        self.num_classes = num_classes
         self.layers = nn.ModuleList()
         prev_size = input_size
         for size in hidden_sizes:
@@ -337,6 +302,8 @@ class RecurrentFFNet(nn.Module):
                 wandb.log({"acc": accuracy, "loss": average_layer_loss, "first_layer_pos_goodness":
                           first_layer_pos_goodness, "first_layer_neg_goodness": first_layer_neg_goodness})
 
+    # TODO: Rename to something like predict_enumerate_classes
+    # TODO: We need a simple predict method
     def predict(self, test_data):
         """
         This function predicts the class labels for the provided test data using
@@ -372,17 +339,17 @@ class RecurrentFFNet(nn.Module):
         """
         with torch.no_grad():
             data, labels = test_data
-            data = data.to(device)
-            labels = labels.to(device)
+            data = data.to(DEVICE)
+            labels = labels.to(DEVICE)
 
             all_labels_goodness = []
 
             # evaluate goodness for each possible label
-            for label in range(NUM_CLASSES):
+            for label in range(self.num_classes):
                 self.reset_activations(False)
 
                 one_hot_labels = torch.zeros(
-                    data.shape[0], NUM_CLASSES, device=device)
+                    data.shape[0], self.num_classes, device=DEVICE)
                 one_hot_labels[:, label] = 1.0
 
                 for _preinit in range(0, len(self.layers)):
@@ -627,23 +594,23 @@ class HiddenLayer(nn.Module):
             activations_dim = self.test_activations_dim
 
         pos_activations_current = torch.zeros(
-            activations_dim[0], activations_dim[1]).to(device)
+            activations_dim[0], activations_dim[1]).to(DEVICE)
         pos_activations_previous = torch.zeros(
-            activations_dim[0], activations_dim[1]).to(device)
+            activations_dim[0], activations_dim[1]).to(DEVICE)
         self.pos_activations = Activations(
             pos_activations_current, pos_activations_previous)
 
         neg_activations_current = torch.zeros(
-            activations_dim[0], activations_dim[1]).to(device)
+            activations_dim[0], activations_dim[1]).to(DEVICE)
         neg_activations_previous = torch.zeros(
-            activations_dim[0], activations_dim[1]).to(device)
+            activations_dim[0], activations_dim[1]).to(DEVICE)
         self.neg_activations = Activations(
             neg_activations_current, neg_activations_previous)
 
         predict_activations_current = torch.zeros(
-            activations_dim[0], activations_dim[1]).to(device)
+            activations_dim[0], activations_dim[1]).to(DEVICE)
         predict_activations_previous = torch.zeros(
-            activations_dim[0], activations_dim[1]).to(device)
+            activations_dim[0], activations_dim[1]).to(DEVICE)
         self.predict_activations = Activations(
             predict_activations_current, predict_activations_previous)
 
@@ -877,64 +844,3 @@ class HiddenLayer(nn.Module):
             self.predict_activations.current = new_activation
 
         return new_activation
-
-
-if __name__ == "__main__":
-    device = torch.device("cuda")
-
-    # Pytorch utils.
-    torch.autograd.set_detect_anomaly(True)
-    torch.manual_seed(1234)
-
-    wandb.init(
-        # set the wandb project where this run will be logged
-        project="Recurrent-FF",
-
-        # track hyperparameters and run metadata
-        config={
-            "architecture": "Recurrent-FF",
-            "dataset": "MNIST",
-            "epochs": EPOCHS,
-            "learning_rate": LEARNING_RATE,
-            "layers": str(LAYERS),
-            "iterations": ITERATIONS,
-            "threshold": THRESHOLD,
-            "damping_factor": DAMPING_FACTOR,
-            "epsilon": EPSILON,
-        }
-    )
-
-    # Generate train data.
-    train_loader, test_loader = MNIST_loaders()
-    x, y_pos = next(iter(train_loader))
-    x, y_pos = x.to(device), y_pos.to(device)
-    train_batch_size = len(x)
-
-    shuffled_labels = torch.randperm(x.size(0))
-    y_neg = y_pos[shuffled_labels]
-
-    positive_one_hot_labels = torch.zeros(
-        len(y_pos), NUM_CLASSES, device=device)
-    positive_one_hot_labels.scatter_(1, y_pos.unsqueeze(1), 1.0)
-
-    negative_one_hot_labels = torch.zeros(
-        len(y_neg), NUM_CLASSES, device=device)
-    negative_one_hot_labels.scatter_(1, y_neg.unsqueeze(1), 1.0)
-
-    input_data = InputData(x, x)
-    label_data = LabelData(positive_one_hot_labels, negative_one_hot_labels)
-
-    # Generate test data.
-    x, y = next(iter(test_loader))
-    x, y = x.to(device), y.to(device)
-    test_batch_size = len(x)
-    labels = y
-    test_data = TestData(x, labels)
-
-    # Create and run model.
-    model = RecurrentFFNet(train_batch_size, test_batch_size,
-                           INPUT_SIZE, LAYERS, NUM_CLASSES).to(device)
-
-    model.train(input_data, label_data, test_data)
-
-    model.predict(test_data)
