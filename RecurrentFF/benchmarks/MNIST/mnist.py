@@ -1,15 +1,9 @@
-from enum import Enum
 import logging
 
-import numpy as np
 import torch
-from torch import nn
-from torch.nn import functional as F
-from torch.optim import Adam
 from torch.utils.data import DataLoader
 from torchvision.datasets import MNIST
 from torchvision.transforms import Compose, ToTensor, Normalize, Lambda
-import torchviz
 import wandb
 
 from RecurrentFF.model.model import RecurrentFFNet, InputData, LabelData, TestData
