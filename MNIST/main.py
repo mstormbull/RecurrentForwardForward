@@ -31,7 +31,7 @@ THRESHOLD = 1
 DAMPING_FACTOR = 0.7
 EPSILON = 1e-8
 LEARNING_RATE = 0.00005
-LAYERS = [500, 250, 200]
+LAYERS = [200, 200, 200]
 
 INPUT_SIZE = 784
 NUM_CLASSES = 10
@@ -579,6 +579,7 @@ class HiddenLayer(nn.Module):
 
         self.forward_linear = nn.Linear(prev_size, size)
         self.backward_linear = nn.Linear(size, prev_size)
+        self.lateral_linear = nn.Linear(size, size)
 
         self.previous_layer = None
         self.next_layer = None
@@ -625,45 +626,34 @@ class HiddenLayer(nn.Module):
         activations_dim = None
         if isTraining:
             activations_dim = self.train_activations_dim
-
-            pos_activations_current = torch.zeros(
-                activations_dim[0], activations_dim[1]).to(device)
-            pos_activations_previous = torch.zeros(
-                activations_dim[0], activations_dim[1]).to(device)
-            self.pos_activations = Activations(
-                pos_activations_current, pos_activations_previous)
-
-            neg_activations_current = torch.zeros(
-                activations_dim[0], activations_dim[1]).to(device)
-            neg_activations_previous = torch.zeros(
-                activations_dim[0], activations_dim[1]).to(device)
-            self.neg_activations = Activations(
-                neg_activations_current, neg_activations_previous)
-
-            self.predict_activations = None
-
         else:
             activations_dim = self.test_activations_dim
 
-            predict_activations_current = torch.zeros(
-                activations_dim[0], activations_dim[1]).to(device)
-            predict_activations_previous = torch.zeros(
-                activations_dim[0], activations_dim[1]).to(device)
-            self.predict_activations = Activations(
-                predict_activations_current, predict_activations_previous)
+        pos_activations_current = torch.zeros(
+            activations_dim[0], activations_dim[1]).to(device)
+        pos_activations_previous = torch.zeros(
+            activations_dim[0], activations_dim[1]).to(device)
+        self.pos_activations = Activations(
+            pos_activations_current, pos_activations_previous)
 
-            self.pos_activations = None
-            self.neg_activations = None
+        neg_activations_current = torch.zeros(
+            activations_dim[0], activations_dim[1]).to(device)
+        neg_activations_previous = torch.zeros(
+            activations_dim[0], activations_dim[1]).to(device)
+        self.neg_activations = Activations(
+            neg_activations_current, neg_activations_previous)
+
+        predict_activations_current = torch.zeros(
+            activations_dim[0], activations_dim[1]).to(device)
+        predict_activations_previous = torch.zeros(
+            activations_dim[0], activations_dim[1]).to(device)
+        self.predict_activations = Activations(
+            predict_activations_current, predict_activations_previous)
 
     def advance_stored_activations(self):
-        if self.pos_activations != None:
-            self.pos_activations.advance()
-
-        if self.neg_activations != None:
-            self.neg_activations.advance()
-
-        if self.predict_activations != None:
-            self.predict_activations.advance()
+        self.pos_activations.advance()
+        self.neg_activations.advance()
+        self.predict_activations.advance()
 
     def set_previous_layer(self, previous_layer):
         self.previous_layer = previous_layer
@@ -800,7 +790,7 @@ class HiddenLayer(nn.Module):
 
             new_activation = F.relu(F.linear(prev_layer_stdized, self.forward_linear.weight) +
                                     F.linear(next_layer_stdized,
-                                             self.next_layer.backward_linear.weight))
+                                             self.next_layer.backward_linear.weight) + F.linear(prev_act, self.lateral_linear.weight))
             if should_damp:
                 old_activation = new_activation
                 new_activation = (1 - self.damping_factor) * \
@@ -819,7 +809,7 @@ class HiddenLayer(nn.Module):
             prev_act = prev_act.detach()
 
             new_activation = F.relu(F.linear(
-                data, self.forward_linear.weight) + F.linear(labels, self.next_layer.backward_linear.weight))
+                data, self.forward_linear.weight) + F.linear(labels, self.next_layer.backward_linear.weight) + F.linear(prev_act, self.lateral_linear.weight))
 
             if should_damp:
                 old_activation = new_activation
@@ -847,7 +837,7 @@ class HiddenLayer(nn.Module):
                 next_layer_prev_timestep_activations)
 
             new_activation = F.relu(F.linear(data, self.forward_linear.weight) + F.linear(
-                next_layer_stdized, self.next_layer.backward_linear.weight))
+                next_layer_stdized, self.next_layer.backward_linear.weight) + F.linear(prev_act, self.lateral_linear.weight))
 
             if should_damp:
                 old_activation = new_activation
@@ -875,7 +865,7 @@ class HiddenLayer(nn.Module):
                 prev_layer_prev_timestep_activations)
 
             new_activation = F.relu(F.linear(prev_layer_stdized,
-                                             self.forward_linear.weight) + F.linear(labels, self.next_layer.backward_linear.weight))
+                                             self.forward_linear.weight) + F.linear(labels, self.next_layer.backward_linear.weight) + F.linear(prev_act, self.lateral_linear.weight))
 
             if should_damp:
                 old_activation = new_activation
@@ -893,7 +883,7 @@ class HiddenLayer(nn.Module):
 
 
 if __name__ == "__main__":
-    device = torch.device("mps")
+    device = torch.device("cuda")
 
     # Pytorch utils.
     torch.autograd.set_detect_anomaly(True)
