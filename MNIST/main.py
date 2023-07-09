@@ -15,9 +15,6 @@ import wandb
 logging.basicConfig(level=logging.DEBUG,
                     format='%(asctime)s - %(levelname)s - %(message)s')
 
-# QUESTIONS:
-# 1 - First layer activations get very sparse?
-
 # TODO:
 # 1 - Implement side connections as shown in Fig3
 # 2 - Experiment with more layers
@@ -59,6 +56,20 @@ def MNIST_loaders(train_batch_size=50000, test_batch_size=10000):
         batch_size=test_batch_size, shuffle=False)
 
     return train_loader, test_loader
+
+
+def standardize_layer_activations(layer_activations):
+    # Compute mean and standard deviation for prev_layer
+    prev_layer_mean = layer_activations.mean(
+        dim=1, keepdim=True)
+    prev_layer_std = layer_activations.std(
+        dim=1, keepdim=True)
+
+    # Apply standardization
+    prev_layer_stdized = (
+        layer_activations - prev_layer_mean) / (prev_layer_std + EPSILON)
+
+    return prev_layer_stdized
 
 
 class InputData:
@@ -497,9 +508,9 @@ class RecurrentFFNet(nn.Module):
         Args:
             mode (ForwardMode): An enum representing the mode of forward
             propagation. This could be PositiveData, NegativeData, or
-            PredictData. input_data
+            PredictData.
 
-            (torch.Tensor): The input data for the
+            input_data (torch.Tensor): The input data for the
             network.
 
             label_data (torch.Tensor): The target labels for the
@@ -566,7 +577,6 @@ class HiddenLayer(nn.Module):
         self.predict_activations = None
         self.reset_activations(True)
 
-        # TODO: weight ordering?
         self.forward_linear = nn.Linear(prev_size, size)
         self.backward_linear = nn.Linear(size, prev_size)
 
@@ -615,34 +625,45 @@ class HiddenLayer(nn.Module):
         activations_dim = None
         if isTraining:
             activations_dim = self.train_activations_dim
+
+            pos_activations_current = torch.zeros(
+                activations_dim[0], activations_dim[1]).to(device)
+            pos_activations_previous = torch.zeros(
+                activations_dim[0], activations_dim[1]).to(device)
+            self.pos_activations = Activations(
+                pos_activations_current, pos_activations_previous)
+
+            neg_activations_current = torch.zeros(
+                activations_dim[0], activations_dim[1]).to(device)
+            neg_activations_previous = torch.zeros(
+                activations_dim[0], activations_dim[1]).to(device)
+            self.neg_activations = Activations(
+                neg_activations_current, neg_activations_previous)
+
+            self.predict_activations = None
+
         else:
             activations_dim = self.test_activations_dim
 
-        pos_activations_current = torch.zeros(
-            activations_dim[0], activations_dim[1]).to(device)
-        pos_activations_previous = torch.zeros(
-            activations_dim[0], activations_dim[1]).to(device)
-        self.pos_activations = Activations(
-            pos_activations_current, pos_activations_previous)
+            predict_activations_current = torch.zeros(
+                activations_dim[0], activations_dim[1]).to(device)
+            predict_activations_previous = torch.zeros(
+                activations_dim[0], activations_dim[1]).to(device)
+            self.predict_activations = Activations(
+                predict_activations_current, predict_activations_previous)
 
-        neg_activations_current = torch.zeros(
-            activations_dim[0], activations_dim[1]).to(device)
-        neg_activations_previous = torch.zeros(
-            activations_dim[0], activations_dim[1]).to(device)
-        self.neg_activations = Activations(
-            neg_activations_current, neg_activations_previous)
-
-        predict_activations_current = torch.zeros(
-            activations_dim[0], activations_dim[1]).to(device)
-        predict_activations_previous = torch.zeros(
-            activations_dim[0], activations_dim[1]).to(device)
-        self.predict_activations = Activations(
-            predict_activations_current, predict_activations_previous)
+            self.pos_activations = None
+            self.neg_activations = None
 
     def advance_stored_activations(self):
-        self.pos_activations.advance()
-        self.neg_activations.advance()
-        self.predict_activations.advance()
+        if self.pos_activations != None:
+            self.pos_activations.advance()
+
+        if self.neg_activations != None:
+            self.neg_activations.advance()
+
+        if self.predict_activations != None:
+            self.predict_activations.advance()
 
     def set_previous_layer(self, previous_layer):
         self.previous_layer = previous_layer
@@ -751,6 +772,7 @@ class HiddenLayer(nn.Module):
             assert self.next_layer != None
 
         # Middle layer.
+        new_activation = None
         if data == None and labels == None:
             next_layer_prev_timestep_activations = None
             prev_layer_prev_timestep_activations = None
@@ -771,23 +793,10 @@ class HiddenLayer(nn.Module):
             prev_layer_prev_timestep_activations = prev_layer_prev_timestep_activations.detach()
             prev_act = prev_act.detach()
 
-            # Compute mean and standard deviation for next_layer
-            next_layer_mean = next_layer_prev_timestep_activations.mean(
-                dim=1, keepdim=True)
-            next_layer_std = next_layer_prev_timestep_activations.std(
-                dim=1, keepdim=True)
-
-            # Compute mean and standard deviation for prev_layer
-            prev_layer_mean = prev_layer_prev_timestep_activations.mean(
-                dim=1, keepdim=True)
-            prev_layer_std = prev_layer_prev_timestep_activations.std(
-                dim=1, keepdim=True)
-
-            # Apply standardization
-            next_layer_stdized = (
-                next_layer_prev_timestep_activations - next_layer_mean) / (next_layer_std + EPSILON)
-            prev_layer_stdized = (
-                prev_layer_prev_timestep_activations - prev_layer_mean) / (prev_layer_std + EPSILON)
+            prev_layer_stdized = standardize_layer_activations(
+                prev_layer_prev_timestep_activations)
+            next_layer_stdized = standardize_layer_activations(
+                next_layer_prev_timestep_activations)
 
             new_activation = F.relu(F.linear(prev_layer_stdized, self.forward_linear.weight) +
                                     F.linear(next_layer_stdized,
@@ -796,15 +805,6 @@ class HiddenLayer(nn.Module):
                 old_activation = new_activation
                 new_activation = (1 - self.damping_factor) * \
                     prev_act + self.damping_factor * old_activation
-
-            if mode == ForwardMode.PositiveData:
-                self.pos_activations.current = new_activation
-            elif mode == ForwardMode.NegativeData:
-                self.neg_activations.current = new_activation
-            elif mode == ForwardMode.PredictData:
-                self.predict_activations.current = new_activation
-
-            return new_activation
 
         # Single layer scenario. Hidden layer connected to input layer and
         # output layer.
@@ -826,15 +826,6 @@ class HiddenLayer(nn.Module):
                 new_activation = (1 - self.damping_factor) * \
                     prev_act + self.damping_factor * old_activation
 
-            if mode == ForwardMode.PositiveData:
-                self.pos_activations.current = new_activation
-            elif mode == ForwardMode.NegativeData:
-                self.neg_activations.current = new_activation
-            elif mode == ForwardMode.PredictData:
-                self.predict_activations.current = new_activation
-
-            return new_activation
-
         # Input layer scenario. Connected to input layer and hidden layer.
         elif data != None:
             prev_act = None
@@ -851,15 +842,9 @@ class HiddenLayer(nn.Module):
             prev_act = prev_act.detach()
             next_layer_prev_timestep_activations = next_layer_prev_timestep_activations.detach()
 
-            # Compute mean and standard deviation for next_layer
-            next_layer_mean = next_layer_prev_timestep_activations.mean(
-                dim=1, keepdim=True)
-            next_layer_std = next_layer_prev_timestep_activations.std(
-                dim=1, keepdim=True)
-
             # Apply standardization
-            next_layer_stdized = (
-                next_layer_prev_timestep_activations - next_layer_mean) / (next_layer_std + EPSILON)
+            next_layer_stdized = standardize_layer_activations(
+                next_layer_prev_timestep_activations)
 
             new_activation = F.relu(F.linear(data, self.forward_linear.weight) + F.linear(
                 next_layer_stdized, self.next_layer.backward_linear.weight))
@@ -868,15 +853,6 @@ class HiddenLayer(nn.Module):
                 old_activation = new_activation
                 new_activation = (1 - self.damping_factor) * \
                     prev_act + self.damping_factor * old_activation
-
-            if mode == ForwardMode.PositiveData:
-                self.pos_activations.current = new_activation
-            elif mode == ForwardMode.NegativeData:
-                self.neg_activations.current = new_activation
-            elif mode == ForwardMode.PredictData:
-                self.predict_activations.current = new_activation
-
-            return new_activation
 
         # Output layer scenario. Connected to hidden layer and output layer.
         elif labels != None:
@@ -894,15 +870,9 @@ class HiddenLayer(nn.Module):
             prev_act = prev_act.detach()
             prev_layer_prev_timestep_activations = prev_layer_prev_timestep_activations.detach()
 
-            # Compute mean and standard deviation for prev_layer
-            prev_layer_mean = prev_layer_prev_timestep_activations.mean(
-                dim=1, keepdim=True)
-            prev_layer_std = prev_layer_prev_timestep_activations.std(
-                dim=1, keepdim=True)
-
             # Apply standardization
-            prev_layer_stdized = (
-                prev_layer_prev_timestep_activations - prev_layer_mean) / (prev_layer_std + EPSILON)
+            prev_layer_stdized = standardize_layer_activations(
+                prev_layer_prev_timestep_activations)
 
             new_activation = F.relu(F.linear(prev_layer_stdized,
                                              self.forward_linear.weight) + F.linear(labels, self.next_layer.backward_linear.weight))
@@ -912,18 +882,18 @@ class HiddenLayer(nn.Module):
                 new_activation = (1 - self.damping_factor) * \
                     prev_act + self.damping_factor * old_activation
 
-            if mode == ForwardMode.PositiveData:
-                self.pos_activations.current = new_activation
-            elif mode == ForwardMode.NegativeData:
-                self.neg_activations.current = new_activation
-            elif mode == ForwardMode.PredictData:
-                self.predict_activations.current = new_activation
+        if mode == ForwardMode.PositiveData:
+            self.pos_activations.current = new_activation
+        elif mode == ForwardMode.NegativeData:
+            self.neg_activations.current = new_activation
+        elif mode == ForwardMode.PredictData:
+            self.predict_activations.current = new_activation
 
-            return new_activation
+        return new_activation
 
 
 if __name__ == "__main__":
-    device = torch.device("cuda")
+    device = torch.device("mps")
 
     # Pytorch utils.
     torch.autograd.set_detect_anomaly(True)
