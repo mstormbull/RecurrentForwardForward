@@ -93,14 +93,12 @@ class LabelData:
 
 
 class TestData:
-    def __init__(self, input, one_hot_labels, labels):
+    def __init__(self, input, labels):
         self.input = input
-        self.one_hot_labels = one_hot_labels
         self.labels = labels
 
     def __iter__(self):
         yield self.input
-        yield self.one_hot_labels
         yield self.labels
 
 
@@ -373,9 +371,8 @@ class RecurrentFFNet(nn.Module):
             accuracy.
         """
         with torch.no_grad():
-            data, one_hot_labels, labels = test_data
+            data, labels = test_data
             data = data.to(device)
-            one_hot_labels = one_hot_labels.to(device)
             labels = labels.to(device)
 
             all_labels_goodness = []
@@ -932,10 +929,7 @@ if __name__ == "__main__":
     x, y = x.to(device), y.to(device)
     test_batch_size = len(x)
     labels = y
-    one_hot_labels = torch.zeros(
-        len(y), NUM_CLASSES, device=device)
-    one_hot_labels.scatter_(1, y.unsqueeze(1), 1.0)
-    test_data = TestData(x, one_hot_labels, labels)
+    test_data = TestData(x, labels)
 
     # Create and run model.
     model = RecurrentFFNet(train_batch_size, test_batch_size,
