@@ -31,7 +31,7 @@ THRESHOLD = 1
 DAMPING_FACTOR = 0.7
 EPSILON = 1e-8
 LEARNING_RATE = 0.00005
-LAYERS = [100, 100, 100]
+LAYERS = [200, 200, 200]
 
 INPUT_SIZE = 784
 NUM_CLASSES = 10
@@ -624,29 +624,35 @@ class HiddenLayer(nn.Module):
         activations_dim = None
         if isTraining:
             activations_dim = self.train_activations_dim
+
+            predict_activations_current = torch.zeros(
+                activations_dim[0], activations_dim[1]).to(device)
+            predict_activations_previous = torch.zeros(
+                activations_dim[0], activations_dim[1]).to(device)
+            self.predict_activations = Activations(
+                predict_activations_current, predict_activations_previous)
+
+            self.pos_activations = None
+            self.neg_activations = None
         else:
             activations_dim = self.test_activations_dim
 
-        pos_activations_current = torch.zeros(
-            activations_dim[0], activations_dim[1]).to(device)
-        pos_activations_previous = torch.zeros(
-            activations_dim[0], activations_dim[1]).to(device)
-        self.pos_activations = Activations(
-            pos_activations_current, pos_activations_previous)
+            pos_activations_current = torch.zeros(
+                activations_dim[0], activations_dim[1]).to(device)
+            pos_activations_previous = torch.zeros(
+                activations_dim[0], activations_dim[1]).to(device)
+            self.pos_activations = Activations(
+                pos_activations_current, pos_activations_previous)
 
-        neg_activations_current = torch.zeros(
-            activations_dim[0], activations_dim[1]).to(device)
-        neg_activations_previous = torch.zeros(
-            activations_dim[0], activations_dim[1]).to(device)
-        self.neg_activations = Activations(
-            neg_activations_current, neg_activations_previous)
+            neg_activations_current = torch.zeros(
+                activations_dim[0], activations_dim[1]).to(device)
+            neg_activations_previous = torch.zeros(
+                activations_dim[0], activations_dim[1]).to(device)
+            self.neg_activations = Activations(
+                neg_activations_current, neg_activations_previous)
+            
+            self.predict_activations = None
 
-        predict_activations_current = torch.zeros(
-            activations_dim[0], activations_dim[1]).to(device)
-        predict_activations_previous = torch.zeros(
-            activations_dim[0], activations_dim[1]).to(device)
-        self.predict_activations = Activations(
-            predict_activations_current, predict_activations_previous)
 
     def advance_stored_activations(self):
         self.pos_activations.advance()
