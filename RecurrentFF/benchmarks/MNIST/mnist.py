@@ -178,7 +178,7 @@ def convert_to_timestep_dims(data):
 
 
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.DEBUG,
+    logging.basicConfig(level=logging.INFO,
                         format='%(asctime)s - %(levelname)s - %(message)s')
 
     # Pytorch utils.

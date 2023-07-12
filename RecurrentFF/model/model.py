@@ -96,7 +96,6 @@ class ForwardMode(Enum):
     PredictData = 3
 
 
-# TODO: optimize this to not have lists
 def activations_to_goodness(activations):
     """
     Computes the 'goodness' of activations for each layer in a neural network by
@@ -257,8 +256,8 @@ class RecurrentFFNet(nn.Module):
                 self.reset_activations(True)
 
                 for preinit_step in range(0, len(self.layers)):
-                    logging.info("Preinitialization step: " +
-                                 str(preinit_step))
+                    logging.debug("Preinitialization step: " +
+                                  str(preinit_step))
 
                     pos_input = input_data.pos_input[0]
                     neg_input = input_data.neg_input[0]
@@ -281,8 +280,8 @@ class RecurrentFFNet(nn.Module):
                     total_loss = self.__advance_layers_train(
                         input_data_sample, label_data_sample, True)
                     average_layer_loss = (total_loss / len(self.layers)).item()
-                    logging.info("Average layer loss: " +
-                                 str(average_layer_loss))
+                    logging.debug("Average layer loss: " +
+                                  str(average_layer_loss))
 
                 pos_goodness_per_layer = [
                     layer_activations_to_goodness(layer.pos_activations.current).mean() for layer in self.layers]
@@ -474,7 +473,7 @@ class RecurrentFFNet(nn.Module):
             else:
                 loss = layer.train(self.optimizer, None, None, should_damp)
             total_loss += loss
-            logging.info("Loss for layer " + str(i) + ": " + str(loss))
+            logging.debug("Loss for layer " + str(i) + ": " + str(loss))
 
         logging.debug("Trained activations for layer " +
                       str(i))
@@ -703,10 +702,10 @@ class HiddenLayer(nn.Module):
 
         # Loss function equivelent to:
         # z = log(1 + exp(((-x + 2) + (y - 2))/2)
-        layer_loss = torch.log(1 + torch.exp(torch.cat([
+        layer_loss = F.softplus(torch.cat([
             (-1 * pos_goodness) + THRESHOLD,
             neg_goodness - THRESHOLD
-        ]))).mean()
+        ])).mean()
 
         layer_loss.backward()
 
