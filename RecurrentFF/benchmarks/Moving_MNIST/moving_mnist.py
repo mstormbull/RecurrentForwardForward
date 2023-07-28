@@ -5,17 +5,17 @@ import time
 import torch
 from torch.utils.data import DataLoader, Dataset
 import wandb
-from matplotlib import pyplot as plt
 from multiprocessing import Process, Manager
 
-from RecurrentFF.model.model import RecurrentFFNet, TrainInputData, TrainLabelData, SingleStaticClassTestData
+from RecurrentFF.model.util import TrainInputData, TrainLabelData, SingleStaticClassTestData
+from RecurrentFF.model.model import RecurrentFFNet
 from RecurrentFF.model.constants import EPOCHS, LEARNING_RATE, THRESHOLD, DAMPING_FACTOR, EPSILON, DEVICE
 
 from RecurrentFF.benchmarks.Moving_MNIST.constants import MOVING_MNIST_DATA_DIR
 
 NUM_CLASSES = 10
 INPUT_SIZE = 4096
-LAYERS = [1000, 1000, 1000]
+LAYERS = [500, 500, 500]
 TRAIN_BATCH_SIZE = 5000
 TEST_BATCH_SIZE = 5000
 ITERATIONS = 10
