@@ -10,7 +10,7 @@ The implementation of the Recurrent Forward Forward Network is based on the [fol
 
 ```
 pip install -e .
-python -m RecurrentFF.benchmarks.MNIST.mnist
+python -m RecurrentFF.benchmarks.mnist.mnist
 ```
 
 ## Model TODO:
