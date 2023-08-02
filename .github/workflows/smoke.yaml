@@ -1,4 +1,4 @@
-name: "Smoke Test Benchmarks"
+name: "Smoke Test"
 
 on:
   pull_request:
@@ -12,7 +12,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
+        with:
+            ref: ${{ github.event.pull_request.head.ref }}
 
       - name: Set up Python
         uses: actions/setup-python@v2
@@ -24,5 +26,5 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r test/pip/requirements.txt
 
-      - name: Validate commands
+      - name: Smoke Test
         run: ./test/scripts/smoke.sh

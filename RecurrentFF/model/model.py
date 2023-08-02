@@ -1,21 +1,21 @@
 import logging
 
+
 import torch
 from torch import nn
-from torch.nn import functional as F
-from torch.optim import Adam
 import wandb
 from profilehooks import profile
 
 from RecurrentFF.model.data_scenario.static_single_class import (
     StaticSingleClassProcessor,
 )
+from RecurrentFF.model.hidden_layer import HiddenLayer
+from RecurrentFF.model.inner_layers import InnerLayers
 from RecurrentFF.util import (
-    Activations,
     ForwardMode,
     OutputLayer,
+    LatentAverager,
     layer_activations_to_goodness,
-    standardize_layer_activations,
 )
 from RecurrentFF.settings import (
     Settings,
@@ -56,8 +56,6 @@ class RecurrentFFNet(nn.Module):
 
         self.settings = Settings()
         self.data_config = data_config
-
-        # TODO: define softmax weights
 
         inner_layers = nn.ModuleList()
         prev_size = data_config.data_size
@@ -128,16 +126,18 @@ class RecurrentFFNet(nn.Module):
         for epoch in range(0, settings.model.epochs):
             logging.info("Epoch: " + str(epoch))
 
-            # TODO: run forward pass to get negative data
-
             for batch_num, (input_data, label_data) in enumerate(train_loader):
+                input_data.move_to_device_inplace(self.settings.device.device)
+                label_data.move_to_device_inplace(self.settings.device.device)
+
+                # TODO: only do this after first few epochs (determine)
+                # if epoch > 1:
+                self.processor.replace_negative_data_inplace(
+                    input_data.pos_input, label_data)
                 average_layer_loss, pos_goodness_per_layer, neg_goodness_per_layer = self.__train_batch(
                     batch_num, input_data, label_data)
 
-            # TODO: train softmax
-
-            # Get some observability into prediction while training. We cannot
-            # use this if the dataset doesn't have static classes.
+            # Get some observability into prediction while training.
             accuracy = self.processor.brute_force_predict(
                 test_loader, 1)
 
@@ -146,9 +146,6 @@ class RecurrentFFNet(nn.Module):
 
     def __train_batch(self, batch_num, input_data, label_data):
         logging.info("Batch: " + str(batch_num))
-
-        input_data.move_to_device_inplace(self.settings.device.device)
-        label_data.move_to_device_inplace(self.settings.device.device)
 
         self.inner_layers.reset_activations(True)
 
@@ -168,6 +165,7 @@ class RecurrentFFNet(nn.Module):
 
         pos_goodness_per_layer = []
         neg_goodness_per_layer = []
+        pos_target_latents = LatentAverager()
         iterations = input_data.pos_input.shape[0]
         for iteration in range(0, iterations):
             logging.debug("Iteration: " + str(iteration))
@@ -191,6 +189,15 @@ class RecurrentFFNet(nn.Module):
                     layer.pos_activations.current).mean() for layer in self.inner_layers])
                 neg_goodness_per_layer.append([layer_activations_to_goodness(
                     layer.neg_activations.current).mean() for layer in self.inner_layers])
+
+                positive_latents = [
+                    layer.pos_activations.current for layer in self.inner_layers]
+                positive_latents = torch.cat(positive_latents, dim=1)
+                pos_target_latents.track_collapsed_latents(positive_latents)
+
+        pos_target_latents = pos_target_latents.retrieve()
+        self.processor.train_class_predictor_from_latents(
+            pos_target_latents, label_data.pos_labels[0])
 
         pos_goodness_per_layer = [
             sum(layer_goodnesses) /
@@ -244,532 +251,3 @@ class RecurrentFFNet(nn.Module):
                        "loss": average_layer_loss,
                        "first_layer_pos_goodness": first_layer_pos_goodness,
                        "first_layer_neg_goodness": first_layer_neg_goodness})
-
-
-class InnerLayers(nn.Module):
-
-    def __init__(self, layers):
-        super(InnerLayers, self).__init__()
-
-        self.settings = Settings()
-
-        self.layers = layers
-        self.optimizer = Adam(
-            self.parameters(), lr=self.settings.model.learning_rate)
-
-    def advance_layers_train(self, input_data, label_data, should_damp):
-        """
-        Advances the training process for all layers in the network by computing
-        the loss for each layer and updating their activations.
-
-        The method handles different layer scenarios: if it's a single layer,
-        both the input data and label data are used for training. If it's the
-        first or last layer in a multi-layer configuration, only the input data
-        or label data is used, respectively. For layers in the middle of a
-        multi-layer network, neither the input data nor the label data is used.
-
-        Args:
-            input_data (torch.Tensor): The input data for the network.
-
-            label_data (torch.Tensor): The target labels for the network.
-
-            should_damp (bool): A flag to determine whether the activation
-            damping should be applied during training.
-
-        Returns:
-            total_loss (float): The accumulated loss over all layers in the
-            network during the current training step.
-
-        Note:
-            The layer's 'train' method is expected to return a loss value, which
-            is accumulated to compute the total loss for the network. After
-            training each layer, their stored activations are advanced by
-            calling the 'advance_stored_activations' method.
-        """
-        total_loss = 0
-        for i, layer in enumerate(self.layers):
-            logging.debug("Training layer " + str(i))
-            loss = None
-            if i == 0 and len(self.layers) == 1:
-                loss = layer.train(self.optimizer, input_data,
-                                   label_data, should_damp)
-            elif i == 0:
-                loss = layer.train(
-                    self.optimizer, input_data, None, should_damp)
-            elif i == len(self.layers) - 1:
-                loss = layer.train(self.optimizer, None,
-                                   label_data, should_damp)
-            else:
-                loss = layer.train(self.optimizer, None, None, should_damp)
-            total_loss += loss
-            logging.debug("Loss for layer " + str(i) + ": " + str(loss))
-
-        logging.debug("Trained activations for layer " +
-                      str(i))
-
-        for layer in self.layers:
-            layer.advance_stored_activations()
-
-        return total_loss
-
-    def advance_layers_forward(
-            self,
-            mode,
-            input_data,
-            label_data,
-            should_damp):
-        """
-        Executes a forward pass through all layers of the network using the
-        given mode, input data, label data, and a damping flag.
-
-        The method handles different layer scenarios: if it's a single layer,
-        both the input data and label data are used for the forward pass. If
-        it's the first or last layer in a multi-layer configuration, only the
-        input data or label data is used, respectively. For layers in the middle
-        of a multi-layer network, neither the input data nor the label data is
-        used.
-
-        After the forward pass, the method advances the stored activations for
-        all layers.
-
-        Args:
-            mode (ForwardMode): An enum representing the mode of forward
-            propagation. This could be PositiveData, NegativeData, or
-            PredictData.
-
-            input_data (torch.Tensor): The input data for the
-            network.
-
-            label_data (torch.Tensor): The target labels for the
-            network.
-
-            should_damp (bool): A flag to determine whether the
-            activation damping should be applied during the forward pass.
-
-        Note:
-            This method doesn't return any value. It modifies the internal state
-            of the layers by performing a forward pass and advancing their
-            stored activations.
-        """
-        for i, layer in enumerate(self.layers):
-            if i == 0 and len(self.layers) == 1:
-                layer.forward(mode, input_data, label_data, should_damp)
-            elif i == 0:
-                layer.forward(mode, input_data, None, should_damp)
-            elif i == len(self.layers) - 1:
-                layer.forward(mode, None, label_data, should_damp)
-            else:
-                layer.forward(mode, None, None, should_damp)
-
-        for layer in self.layers:
-            layer.advance_stored_activations()
-
-    def reset_activations(self, isTraining):
-        for layer in self.layers:
-            layer.reset_activations(isTraining)
-
-    def __len__(self):
-        return len(self.layers)
-
-    def __iter__(self):
-        return (layer for layer in self.layers)
-
-
-class HiddenLayer(nn.Module):
-    """
-    A HiddenLayer class for a novel Forward-Forward Recurrent Network, with
-    inspiration drawn from Boltzmann Machines and Noise Contrastive Estimation.
-    This network design is characterized by two distinct forward passes, each
-    with specific objectives: one is dedicated to processing positive ("real")
-    data with the aim of enhancing the 'goodness' across every hidden layer,
-    while the other is tasked with processing negative data and adjusting the
-    weights to reduce the 'goodness' metric.
-
-    The HiddenLayer is essentially a node within this network, with possible
-    connections to both preceding and succeeding layers, depending on its
-    specific location within the network architecture. The first layer in this
-    setup is connected directly to the input data, and the last layer maintains
-    a connection to the output data. The intermediate layers establish a link to
-    both their previous and next layers, if available.
-
-    In each HiddenLayer, a forward linear transformation and a backward linear
-    transformation are defined. The forward transformation is applied to the
-    activations from the previous layer, while the backward transformation is
-    applied to the activations of the subsequent layer. The forward
-    transformation helps in propagating the data through the network, and the
-    backward transformation is key in the learning process where it aids in the
-    adjustment of weights based on the output or next layer's activations.
-    """
-
-    def __init__(
-            self,
-            train_batch_size,
-            test_batch_size,
-            prev_size,
-            size,
-            damping_factor):
-        super(HiddenLayer, self).__init__()
-
-        self.settings = Settings()
-
-        self.train_activations_dim = (train_batch_size, size)
-        self.test_activations_dim = (test_batch_size, size)
-
-        self.damping_factor = damping_factor
-
-        self.pos_activations = None
-        self.neg_activations = None
-        self.predict_activations = None
-        self.reset_activations(True)
-
-        self.forward_linear = nn.Linear(prev_size, size)
-        self.backward_linear = nn.Linear(size, prev_size)
-        self.lateral_linear = nn.Linear(size, size)
-
-        self.previous_layer = None
-        self.next_layer = None
-
-    def _apply(self, fn):
-        """
-        Override apply, but we don't want to apply to sibling layers as that
-        will cause a stack overflow. The hidden layers are contained in a
-        collection in the higher-level RecurrentFFNet. They will all get the
-        apply call from there.
-        """
-        # Apply `fn` to each parameter and buffer of this layer
-        for param in self._parameters.values():
-            if param is not None:
-                # Tensors stored in modules are graph leaves, and we don't
-                # want to create copy nodes, so we have to unpack the data.
-                param.data = fn(param.data)
-                if param._grad is not None:
-                    param._grad.data = fn(param._grad.data)
-
-        for key, buf in self._buffers.items():
-            if buf is not None:
-                self._buffers[key] = fn(buf)
-
-        # Then remove `previous_layer` and `next_layer` temporarily
-        previous_layer = self.previous_layer
-        next_layer = self.next_layer
-        self.previous_layer = None
-        self.next_layer = None
-
-        # Apply `fn` to submodules
-        for module in self.children():
-            module._apply(fn)
-
-        # Restore `previous_layer` and `next_layer`
-        self.previous_layer = previous_layer
-        self.next_layer = next_layer
-
-        return self
-
-    def reset_activations(self, isTraining):
-        activations_dim = None
-        if isTraining:
-            activations_dim = self.train_activations_dim
-
-            pos_activations_current = torch.zeros(
-                activations_dim[0], activations_dim[1]).to(
-                self.settings.device.device)
-            pos_activations_previous = torch.zeros(
-                activations_dim[0], activations_dim[1]).to(
-                self.settings.device.device)
-            self.pos_activations = Activations(
-                pos_activations_current, pos_activations_previous)
-
-            neg_activations_current = torch.zeros(
-                activations_dim[0], activations_dim[1]).to(
-                self.settings.device.device)
-            neg_activations_previous = torch.zeros(
-                activations_dim[0], activations_dim[1]).to(
-                self.settings.device.device)
-            self.neg_activations = Activations(
-                neg_activations_current, neg_activations_previous)
-
-            self.predict_activations = None
-
-        else:
-            activations_dim = self.test_activations_dim
-
-            predict_activations_current = torch.zeros(
-                activations_dim[0], activations_dim[1]).to(
-                self.settings.device.device)
-            predict_activations_previous = torch.zeros(
-                activations_dim[0], activations_dim[1]).to(
-                self.settings.device.device)
-            self.predict_activations = Activations(
-                predict_activations_current, predict_activations_previous)
-
-            self.pos_activations = None
-            self.neg_activations = None
-
-    def advance_stored_activations(self):
-        if self.pos_activations is not None:
-            self.pos_activations.advance()
-
-        if self.neg_activations is not None:
-            self.neg_activations.advance()
-
-        if self.predict_activations is not None:
-            self.predict_activations.advance()
-
-    def set_previous_layer(self, previous_layer):
-        self.previous_layer = previous_layer
-
-    def set_next_layer(self, next_layer):
-        self.next_layer = next_layer
-
-    def train(self, optimizer, input_data, label_data, should_damp):
-        settings = Settings()
-
-        optimizer.zero_grad()
-
-        pos_activations = None
-        neg_activations = None
-        if input_data is not None and label_data is not None:
-            (pos_input, neg_input) = input_data
-            (pos_labels, neg_labels) = label_data
-            pos_activations = self.forward(
-                ForwardMode.PositiveData, pos_input, pos_labels, should_damp)
-            neg_activations = self.forward(
-                ForwardMode.NegativeData, neg_input, neg_labels, should_damp)
-        elif input_data is not None:
-            (pos_input, neg_input) = input_data
-            pos_activations = self.forward(
-                ForwardMode.PositiveData, pos_input, None, should_damp)
-            neg_activations = self.forward(
-                ForwardMode.NegativeData, neg_input, None, should_damp)
-        elif label_data is not None:
-            (pos_labels, neg_labels) = label_data
-            pos_activations = self.forward(
-                ForwardMode.PositiveData, None, pos_labels, should_damp)
-            neg_activations = self.forward(
-                ForwardMode.NegativeData, None, neg_labels, should_damp)
-        else:
-            pos_activations = self.forward(
-                ForwardMode.PositiveData, None, None, should_damp)
-            neg_activations = self.forward(
-                ForwardMode.NegativeData, None, None, should_damp)
-
-        pos_goodness = layer_activations_to_goodness(pos_activations)
-        neg_goodness = layer_activations_to_goodness(neg_activations)
-
-        logging.debug("pos goodness: " + str(pos_goodness))
-        logging.debug("neg goodness: " + str(neg_goodness))
-
-        # Loss function equivelent to:
-        # L = log(1 + exp(((-p + 2) + (n - 2))/2)
-        layer_loss = F.softplus(torch.cat([
-            (-1 * pos_goodness) + settings.model.loss_threshold,
-            neg_goodness - settings.model.loss_threshold
-        ])).mean()
-
-        layer_loss.backward()
-
-        optimizer.step()
-        optimizer.zero_grad()
-
-        return layer_loss
-
-    def forward(self, mode, data, labels, should_damp):
-        """
-        Propagates input data forward through the network, updating the
-        activation state of the current layer based on the operating mode.
-
-        Handles various scenarios depending on the layer configuration in the
-        network (input layer, output layer, or a middle layer).
-
-        Args:
-            mode (ForwardMode enum): Indicates the type of data being propagated
-            (positive, negative, or prediction).
-
-            data (torch.Tensor or None): The input data for the layer. If
-            `None`, it indicates that this layer is not the input layer.
-
-            labels (torch.Tensor or None): The target labels for the layer. If
-            `None`, it indicates that this layer is not the output layer.
-
-            should_damp (bool): A flag to determine whether the activation
-            damping should be applied.
-
-        Returns:
-            new_activation (torch.Tensor): The updated activation state of the
-            layer after the forward propagation.
-
-        Note:
-            'Damping' here refers to a technique used to smoothen the changes in
-            the layer activations over time. In this function, damping is
-            implemented as a weighted average of the previous and the newly
-            computed activations, controlled by the `self.damping_factor`.
-
-            The function expects to receive input data and/or labels depending
-            on the layer. The absence of both implies the current layer is a
-            'middle' layer. If only the labels are missing, this layer is an
-            'input' layer, while if only the data is missing, it's an 'output'
-            layer. If both are provided, the network has only a single layer.
-
-            All four scenarios are handled separately in the function, although
-            the general procedure is similar: compute new activations based on
-            the received inputs (and possibly, depending on the layer's
-            position, the activations of the adjacent layers), optionally apply
-            damping, update the current layer's activations, and return the new
-            activations.
-        """
-        # Make sure assumptions aren't violated regarding layer connectivity.
-        if data is None:
-            assert self.previous_layer is not None
-        if labels is None:
-            assert self.next_layer is not None
-
-        # Middle layer.
-        new_activation = None
-        if data is None and labels is None:
-            next_layer_prev_timestep_activations = None
-            prev_layer_prev_timestep_activations = None
-            prev_act = None
-            if mode == ForwardMode.PositiveData:
-                next_layer_prev_timestep_activations = self.next_layer.pos_activations.previous
-                prev_layer_prev_timestep_activations = self.previous_layer.pos_activations.previous
-                prev_act = self.pos_activations.previous
-            elif mode == ForwardMode.NegativeData:
-                next_layer_prev_timestep_activations = self.next_layer.neg_activations.previous
-                prev_layer_prev_timestep_activations = self.previous_layer.neg_activations.previous
-                prev_act = self.neg_activations.previous
-            elif mode == ForwardMode.PredictData:
-                next_layer_prev_timestep_activations = self.next_layer.predict_activations.previous
-                prev_layer_prev_timestep_activations = self.previous_layer.predict_activations.previous
-                prev_act = self.predict_activations.previous
-            next_layer_prev_timestep_activations = next_layer_prev_timestep_activations.detach()
-            prev_layer_prev_timestep_activations = prev_layer_prev_timestep_activations.detach()
-            prev_act = prev_act.detach()
-
-            prev_layer_stdized = standardize_layer_activations(
-                prev_layer_prev_timestep_activations)
-            next_layer_stdized = standardize_layer_activations(
-                next_layer_prev_timestep_activations)
-
-            new_activation = F.relu(
-                F.linear(
-                    prev_layer_stdized,
-                    self.forward_linear.weight) +
-                F.linear(
-                    next_layer_stdized,
-                    self.next_layer.backward_linear.weight) +
-                F.linear(
-                    prev_act,
-                    self.lateral_linear.weight))
-            if should_damp:
-                old_activation = new_activation
-                new_activation = (1 - self.damping_factor) * \
-                    prev_act + self.damping_factor * old_activation
-
-        # Single layer scenario. Hidden layer connected to input layer and
-        # output layer.
-        elif data is not None and labels is not None:
-            prev_act = None
-            if mode == ForwardMode.PositiveData:
-                prev_act = self.pos_activations.previous
-            elif mode == ForwardMode.NegativeData:
-                prev_act = self.neg_activations.previous
-            elif mode == ForwardMode.PredictData:
-                prev_act = self.predict_activations.previous
-            prev_act = prev_act.detach()
-
-            new_activation = F.relu(
-                F.linear(
-                    data,
-                    self.forward_linear.weight) +
-                F.linear(
-                    labels,
-                    self.next_layer.backward_linear.weight) +
-                F.linear(
-                    prev_act,
-                    self.lateral_linear.weight))
-
-            if should_damp:
-                old_activation = new_activation
-                new_activation = (1 - self.damping_factor) * \
-                    prev_act + self.damping_factor * old_activation
-
-        # Input layer scenario. Connected to input layer and hidden layer.
-        elif data is not None:
-            prev_act = None
-            next_layer_prev_timestep_activations = None
-            if mode == ForwardMode.PositiveData:
-                next_layer_prev_timestep_activations = self.next_layer.pos_activations.previous
-                prev_act = self.pos_activations.previous
-            elif mode == ForwardMode.NegativeData:
-                next_layer_prev_timestep_activations = self.next_layer.neg_activations.previous
-                prev_act = self.neg_activations.previous
-            elif mode == ForwardMode.PredictData:
-                next_layer_prev_timestep_activations = self.next_layer.predict_activations.previous
-                prev_act = self.predict_activations.previous
-            prev_act = prev_act.detach()
-            next_layer_prev_timestep_activations = next_layer_prev_timestep_activations.detach()
-
-            # Apply standardization
-            next_layer_stdized = standardize_layer_activations(
-                next_layer_prev_timestep_activations)
-
-            new_activation = F.relu(
-                F.linear(
-                    data,
-                    self.forward_linear.weight) +
-                F.linear(
-                    next_layer_stdized,
-                    self.next_layer.backward_linear.weight) +
-                F.linear(
-                    prev_act,
-                    self.lateral_linear.weight))
-
-            if should_damp:
-                old_activation = new_activation
-                new_activation = (1 - self.damping_factor) * \
-                    prev_act + self.damping_factor * old_activation
-
-        # Output layer scenario. Connected to hidden layer and output layer.
-        elif labels is not None:
-            prev_layer_prev_timestep_activations = None
-            prev_act = None
-            if mode == ForwardMode.PositiveData:
-                prev_layer_prev_timestep_activations = self.previous_layer.pos_activations.previous
-                prev_act = self.pos_activations.previous
-            elif mode == ForwardMode.NegativeData:
-                prev_layer_prev_timestep_activations = self.previous_layer.neg_activations.previous
-                prev_act = self.neg_activations.previous
-            elif mode == ForwardMode.PredictData:
-                prev_layer_prev_timestep_activations = self.previous_layer.predict_activations.previous
-                prev_act = self.predict_activations.previous
-            prev_act = prev_act.detach()
-            prev_layer_prev_timestep_activations = prev_layer_prev_timestep_activations.detach()
-
-            # Apply standardization
-            prev_layer_stdized = standardize_layer_activations(
-                prev_layer_prev_timestep_activations)
-
-            new_activation = F.relu(
-                F.linear(
-                    prev_layer_stdized,
-                    self.forward_linear.weight) +
-                F.linear(
-                    labels,
-                    self.next_layer.backward_linear.weight) +
-                F.linear(
-                    prev_act,
-                    self.lateral_linear.weight))
-
-            if should_damp:
-                old_activation = new_activation
-                new_activation = (1 - self.damping_factor) * \
-                    prev_act + self.damping_factor * old_activation
-
-        if mode == ForwardMode.PositiveData:
-            self.pos_activations.current = new_activation
-        elif mode == ForwardMode.NegativeData:
-            self.neg_activations.current = new_activation
-        elif mode == ForwardMode.PredictData:
-            self.predict_activations.current = new_activation
-
-        return new_activation

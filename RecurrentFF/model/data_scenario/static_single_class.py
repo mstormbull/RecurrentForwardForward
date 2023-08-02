@@ -1,17 +1,121 @@
 import logging
 
 import torch
+from torch import nn
+from torch.nn import functional as F
+from torch.optim import Adam
 
 from RecurrentFF.model.data_scenario.processor import DataScenarioProcessor
-from RecurrentFF.util import layer_activations_to_goodness, ForwardMode
+from RecurrentFF.model.inner_layers import InnerLayers
+from RecurrentFF.util import DataConfig, LatentAverager, TrainLabelData, layer_activations_to_goodness, ForwardMode
 from RecurrentFF.settings import Settings
 
 
+def formulate_incorrect_class(prob_tensor, correct_onehot_tensor):
+    """
+    Finds the one-hot encoded class with the highest probability that is not the
+    correct class from prob_tensor.
+
+    Args:
+        prob_tensor (torch.Tensor): Tensor of shape [batch_size, classes]
+            containing probabilities.
+        correct_onehot_tensor (torch.Tensor): One-hot encoded tensor of shape
+            [batch_size, classes] containing correct classes.
+
+    Returns:
+        torch.Tensor: One-hot encoded tensor of shape [batch_size, classes]
+            with the highest incorrect class.
+    """
+    # Zero out the probabilities corresponding to the correct class
+    masked_prob_tensor = prob_tensor * (1 - correct_onehot_tensor)
+
+    # Find the indices of the maximum values along the classes dimension
+    _, max_indices = torch.max(masked_prob_tensor, dim=1)
+
+    # Create a tensor with zeros and the same shape as the prob_tensor
+    result_onehot_tensor = torch.zeros_like(prob_tensor)
+
+    # Assign 1 to the indices found above
+    result_onehot_tensor.scatter_(1, max_indices.unsqueeze(1), 1)
+
+    return result_onehot_tensor
+
+
 class StaticSingleClassProcessor(DataScenarioProcessor):
-    def __init__(self, inner_layers, data_config):
+    def __init__(self, inner_layers: InnerLayers, data_config: DataConfig):
         self.inner_layers = inner_layers
         self.data_config = data_config
         self.settings = Settings()
+
+        self.classification_weights = nn.Linear(
+            sum(self.settings.model.hidden_sizes), self.data_config.num_classes).to(device=self.settings.device.device)
+
+        # TODO: do we need to explore what learning rate is best?
+        self.optimizer = Adam(
+            self.classification_weights.parameters())
+
+    def train_class_predictor_from_latents(self, latents: torch.Tensor, labels: torch.Tensor):
+        """
+        Trains the classification model using the given latent vectors and
+        corresponding labels.
+
+        The method performs one step of optimization by computing the cross-
+        entropy loss between the predicted logits and the true labels,
+        performing backpropagation, and then updating the model's parameters.
+
+        Args:
+            latents (torch.Tensor): A tensor containing the latent
+                representations of the inputs.
+            labels (torch.Tensor): A tensor containing the true labels
+                corresponding to the latents.
+        """
+        self.optimizer.zero_grad()
+        latents = latents.detach()
+
+        class_logits = F.linear(
+            latents, self.classification_weights.weight)
+
+        # Compute the cross-entropy loss between the predicted probabilities and the true labels
+        loss = F.cross_entropy(
+            class_logits, labels)
+
+        # Perform backpropagation to compute the gradients
+        loss.backward()
+
+        # Update the parameters with the optimizer
+        self.optimizer.step()
+
+        logging.info(
+            f"loss for training optimization classifier: {loss.item()}")
+
+    def replace_negative_data_inplace(self, input_batch: torch.Tensor, input_labels: TrainLabelData):
+        """
+        Replaces the negative labels in the given input labels with incorrect
+        class labels, based on the latent representations of the input batch.
+
+        This method retrieves the latents, computes the class logits and
+        probabilities, and then formulates incorrect class labels, replacing
+        the negative labels in the input labels in-place.
+
+        The point is to choose samples which the model thinks are positive data,
+        but aren't.
+
+        Args:
+            input_batch (torch.Tensor): A tensor containing the input batch
+                of data.
+            input_labels (TrainLabelData): A custom data structure containing
+                positive and negative labels, where the negative labels will
+                be replaced.
+        """
+        latents = self.__retrieve_latents__(input_batch, input_labels)
+
+        class_logits = F.linear(latents, self.classification_weights.weight)
+        class_probabilities = F.softmax(class_logits, dim=-1)
+        negative_labels = formulate_incorrect_class(
+            class_probabilities, input_labels.pos_labels[0])
+
+        frames = input_labels.pos_labels.shape[0]
+        input_labels.neg_labels = negative_labels.repeat(frames, 1)
 
     def brute_force_predict(self, test_loader, limit_batches=None):
         """
@@ -129,3 +233,37 @@ class StaticSingleClassProcessor(DataScenarioProcessor):
         logging.info(f'test accuracy: {accuracy}%')
 
         return accuracy
+
+    def __retrieve_latents__(self, input_batch: torch.Tensor, input_labels: TrainLabelData) -> torch.Tensor:
+        self.inner_layers.reset_activations(False)
+
+        # assign equal probability to all labels
+        batch_size = input_labels.pos_labels[0].shape[0]
+        num_classes = input_labels.pos_labels[0].shape[1]
+        equally_distributed_class_labels = torch.full(
+            (batch_size, num_classes), 1 / num_classes).to(device=self.settings.device.device)
+
+        iterations = input_batch.shape[0]
+
+        # feed data through network and track latents
+        for _preinit_iteration in range(0, len(self.inner_layers)):
+            self.inner_layers.advance_layers_forward(
+                ForwardMode.PredictData, input_batch[0], equally_distributed_class_labels, False)
+
+        lower_iteration_threshold = iterations // 2 - \
+            self.data_config.focus_iteration_neg_offset
+        upper_iteration_threshold = iterations // 2 + \
+            self.data_config.focus_iteration_pos_offset
+        target_latents = LatentAverager()
+        for iteration in range(0, iterations):
+            self.inner_layers.advance_layers_forward(
+                ForwardMode.PredictData, input_batch[iteration], equally_distributed_class_labels, True)
+
+            if iteration >= lower_iteration_threshold and iteration <= upper_iteration_threshold:
+                latents = [
+                    layer.predict_activations.current for layer in self.inner_layers]
+                latents = torch.cat(latents, dim=1).to(
+                    device=self.settings.device.device)
+                target_latents.track_collapsed_latents(latents)
+
+        return target_latents.retrieve()

@@ -79,6 +79,7 @@ class TrainLabelData:
         self.neg_labels = self.neg_labels.to(device)
 
 
+# TODO: move this to static singleclass
 # input of dims (batch size, num classes)
 class SingleStaticClassTestData:
     def __init__(self, input, labels):
@@ -173,3 +174,45 @@ def layer_activations_to_goodness(layer_activations):
         torch.square(layer_activations), dim=1)
 
     return goodness_for_layer
+
+
+class LatentAverager:
+    """
+    This class is used for tracking and averaging tensors of the same shape.
+    It's useful for collapsing latents in a series of computations.
+    """
+
+    def __init__(self):
+        """
+        Initialize the LatentAverager with an empty sum_tensor and a zero count.
+        """
+        self.sum_tensor = None
+        self.count = 0
+
+    def track_collapsed_latents(self, tensor: torch.Tensor):
+        """
+        Add the given tensor to the tracked sum.
+
+        :param tensor: A tensor to be tracked.
+        :type tensor: torch.Tensor
+        :raises AssertionError: If the shape of the tensor does not match the shape of the sum_tensor.
+        """
+        if self.sum_tensor is None:
+            self.sum_tensor = tensor
+            self.count = 1
+        else:
+            assert tensor.shape == self.sum_tensor.shape, "Shape mismatch"
+            self.sum_tensor += tensor
+            self.count += 1
+
+    def retrieve(self) -> torch.Tensor:
+        """
+        Retrieve the averaged tensor.
+
+        :return: The averaged tensor.
+        :rtype: torch.Tensor
+        :raises ValueError: If no tensors have been tracked.
+        """
+        if self.count == 0:
+            raise ValueError("No tensors have been tracked")
+        return self.sum_tensor / self.count
