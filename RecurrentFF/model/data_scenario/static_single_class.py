@@ -10,9 +10,9 @@ from RecurrentFF.model.inner_layers import InnerLayers
 from RecurrentFF.util import DataConfig, LatentAverager, TrainLabelData, layer_activations_to_goodness, ForwardMode
 from RecurrentFF.settings import Settings
 
-def formulate_incorrect_class(prob_tensor, correct_onehot_tensor):
+def formulate_incorrect_class(prob_tensor: torch.Tensor, correct_onehot_tensor: torch.Tensor) -> torch.Tensor:
     """
-    Finds the one-hot encoded class with the highest probability that is not the
+    Finds the one-hot encoded class with a probabilistic selection that is not the
     correct class from prob_tensor.
 
     Args:
@@ -23,31 +23,41 @@ def formulate_incorrect_class(prob_tensor, correct_onehot_tensor):
 
     Returns:
         torch.Tensor: One-hot encoded tensor of shape [batch_size, classes]
-            with the highest incorrect class.
+            with the selected incorrect class.
     """
+    settings = Settings()
+
     correct = 0
     incorrect = 0
-    for i in range(prob_tensor.shape[0]):
-        max_index_prob = torch.argmax(prob_tensor[i])
-        max_index_correct = torch.argmax(correct_onehot_tensor[i])
-        if max_index_prob == max_index_correct:
-            correct += 1
-        else:
-            incorrect += 1
     
-    logging.info("optimization classifier accuracy: " + str(correct / (correct + incorrect)))
-
     # Zero out the probabilities corresponding to the correct class
     masked_prob_tensor = prob_tensor * (1 - correct_onehot_tensor)
 
-    # Find the indices of the maximum values along the classes dimension
-    _, max_indices = torch.max(masked_prob_tensor, dim=1)
-
     # Create a tensor with zeros and the same shape as the prob_tensor
-    result_onehot_tensor = torch.zeros_like(prob_tensor)
+    result_onehot_tensor = torch.zeros_like(prob_tensor).to(device=settings.device.device)
 
-    # Assign 1 to the indices found above
-    result_onehot_tensor.scatter_(1, max_indices.unsqueeze(1), 1)
+    for i in range(prob_tensor.shape[0]):
+        # Create a cumulative sum of the masked probabilities
+        cumulative_prob = torch.cumsum(masked_prob_tensor[i], dim=0)
+
+        # Generate a random number
+        rand_num = torch.rand(1).to(device=settings.device.device)
+
+        # Find the index where the random number is less than the cumulative probability
+        # selected_index = (rand_num < cumulative_prob).nonzero(as_tuple=True)[0].item()
+        selected_index = (rand_num < cumulative_prob).argmax().item()
+
+
+        # Assign 1 to the selected index
+        result_onehot_tensor[i, selected_index] = 1
+
+        max_index_correct = torch.argmax(correct_onehot_tensor[i])
+        if selected_index == max_index_correct:
+            correct += 1
+        else:
+            incorrect += 1
+
+    logging.info("optimization classifier accuracy: " + str(correct / (correct + incorrect)))
 
     return result_onehot_tensor
 
