@@ -131,9 +131,10 @@ class RecurrentFFNet(nn.Module):
                 label_data.move_to_device_inplace(self.settings.device.device)
 
                 # TODO: only do this after first few epochs (determine)
-                # if epoch > 1:
-                self.processor.replace_negative_data_inplace(
-                    input_data.pos_input, label_data)
+                if epoch > 25:
+                    self.processor.replace_negative_data_inplace(
+                        input_data.pos_input, label_data)
+
                 average_layer_loss, pos_goodness_per_layer, neg_goodness_per_layer = self.__train_batch(
                     batch_num, input_data, label_data)
 

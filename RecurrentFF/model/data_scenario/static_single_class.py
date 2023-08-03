@@ -10,7 +10,6 @@ from RecurrentFF.model.inner_layers import InnerLayers
 from RecurrentFF.util import DataConfig, LatentAverager, TrainLabelData, layer_activations_to_goodness, ForwardMode
 from RecurrentFF.settings import Settings
 
-
 def formulate_incorrect_class(prob_tensor, correct_onehot_tensor):
     """
     Finds the one-hot encoded class with the highest probability that is not the
@@ -26,6 +25,18 @@ def formulate_incorrect_class(prob_tensor, correct_onehot_tensor):
         torch.Tensor: One-hot encoded tensor of shape [batch_size, classes]
             with the highest incorrect class.
     """
+    correct = 0
+    incorrect = 0
+    for i in range(prob_tensor.shape[0]):
+        max_index_prob = torch.argmax(prob_tensor[i])
+        max_index_correct = torch.argmax(correct_onehot_tensor[i])
+        if max_index_prob == max_index_correct:
+            correct += 1
+        else:
+            incorrect += 1
+    
+    logging.info("optimization classifier accuracy: " + str(correct / (correct + incorrect)))
+
     # Zero out the probabilities corresponding to the correct class
     masked_prob_tensor = prob_tensor * (1 - correct_onehot_tensor)
 
@@ -235,7 +246,7 @@ class StaticSingleClassProcessor(DataScenarioProcessor):
         return accuracy
 
     def __retrieve_latents__(self, input_batch: torch.Tensor, input_labels: TrainLabelData) -> torch.Tensor:
-        self.inner_layers.reset_activations(False)
+        self.inner_layers.reset_activations(True)
 
         # assign equal probability to all labels
         batch_size = input_labels.pos_labels[0].shape[0]
@@ -248,7 +259,7 @@ class StaticSingleClassProcessor(DataScenarioProcessor):
         # feed data through network and track latents
         for _preinit_iteration in range(0, len(self.inner_layers)):
             self.inner_layers.advance_layers_forward(
-                ForwardMode.PredictData, input_batch[0], equally_distributed_class_labels, False)
+                ForwardMode.PositiveData, input_batch[0], equally_distributed_class_labels, False)
 
         lower_iteration_threshold = iterations // 2 - \
             self.data_config.focus_iteration_neg_offset
@@ -257,11 +268,11 @@ class StaticSingleClassProcessor(DataScenarioProcessor):
         target_latents = LatentAverager()
         for iteration in range(0, iterations):
             self.inner_layers.advance_layers_forward(
-                ForwardMode.PredictData, input_batch[iteration], equally_distributed_class_labels, True)
+                ForwardMode.PositiveData, input_batch[iteration], equally_distributed_class_labels, True)
 
             if iteration >= lower_iteration_threshold and iteration <= upper_iteration_threshold:
                 latents = [
-                    layer.predict_activations.current for layer in self.inner_layers]
+                    layer.pos_activations.current for layer in self.inner_layers]
                 latents = torch.cat(latents, dim=1).to(
                     device=self.settings.device.device)
                 target_latents.track_collapsed_latents(latents)
