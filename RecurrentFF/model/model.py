@@ -131,7 +131,7 @@ class RecurrentFFNet(nn.Module):
                 label_data.move_to_device_inplace(self.settings.device.device)
 
                 # TODO: only do this after first few epochs (determine)
-                if epoch > 0:
+                if epoch >= 0:
                     self.processor.replace_negative_data_inplace(
                         input_data.pos_input, label_data)
 

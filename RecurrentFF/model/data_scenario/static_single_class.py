@@ -27,35 +27,42 @@ def formulate_incorrect_class(prob_tensor: torch.Tensor, correct_onehot_tensor: 
     """
     settings = Settings()
 
-    correct = 0
-    incorrect = 0
-    
     # Zero out the probabilities corresponding to the correct class
     masked_prob_tensor = prob_tensor * (1 - correct_onehot_tensor)
+
+    # Create a cumulative sum of the masked probabilities along the classes dimension
+    cumulative_prob = torch.cumsum(masked_prob_tensor, dim=1)
+
+    # Generate random numbers for the entire batch
+    rand_nums = torch.rand(cumulative_prob.size(0), 1).to(device=settings.device.device)
+
+    # Expand random numbers to the same shape as cumulative_prob for comparison
+    rand_nums_expanded = rand_nums.expand_as(cumulative_prob)
+
+    # Find the first index where each random number is less than the cumulative probability
+    selected_indices = (rand_nums_expanded < cumulative_prob).argmax(dim=1)
 
     # Create a tensor with zeros and the same shape as the prob_tensor
     result_onehot_tensor = torch.zeros_like(prob_tensor).to(device=settings.device.device)
 
-    for i in range(prob_tensor.shape[0]):
-        # Create a cumulative sum of the masked probabilities
-        cumulative_prob = torch.cumsum(masked_prob_tensor[i], dim=0)
+    # Batch-wise assignment of 1 to the selected indices
+    result_onehot_tensor.scatter_(1, selected_indices.unsqueeze(1), 1)
 
-        # Generate a random number
-        rand_num = torch.rand(1).to(device=settings.device.device)
+    # Compute accuracy
+    max_indices_correct = correct_onehot_tensor.argmax(dim=1)
+    correct = (selected_indices == max_indices_correct).sum().item()
+    incorrect = prob_tensor.size(0) - correct
 
-        # Find the index where the random number is less than the cumulative probability
-        # selected_index = (rand_num < cumulative_prob).nonzero(as_tuple=True)[0].item()
-        selected_index = (rand_num < cumulative_prob).argmax().item()
-
-
-        # Assign 1 to the selected index
-        result_onehot_tensor[i, selected_index] = 1
-
-        max_index_correct = torch.argmax(correct_onehot_tensor[i])
-        if selected_index == max_index_correct:
-            correct += 1
-        else:
-            incorrect += 1
+    for i in range(0, selected_indices.shape[0]):
+        if selected_indices[i].equal(max_indices_correct[i]):
+            logging.debug("correct class selected")
+            print(correct_onehot_tensor[i])
+            print(prob_tensor[i])
+            print(cumulative_prob[i])
+            print(selected_indices[i])
+            print(max_indices_correct[i])
+            print(rand_nums_expanded[i])
+            input()
 
     logging.info("optimization classifier accuracy: " + str(correct / (correct + incorrect)))
 
