@@ -65,7 +65,7 @@ class RecurrentFFNet(nn.Module):
         logging.info("initializing network")
         super(RecurrentFFNet, self).__init__()
 
-        self.settings = Settings()
+        self.settings = Settings.new()
         self.data_config = data_config
 
         inner_layers = nn.ModuleList()
@@ -104,7 +104,7 @@ class RecurrentFFNet(nn.Module):
         logging.info("finished initializing network")
 
     @profile(stdout=False, filename='baseline.prof',
-             skip=Settings().model.skip_profiling)
+             skip=Settings.new().model.skip_profiling)
     def train(self, train_loader, test_loader):
         """
         Trains the RecurrentFFNet model using the provided train and test data loaders.
@@ -132,7 +132,7 @@ class RecurrentFFNet(nn.Module):
             layer's activations into a 'goodness' score. This function operates on the RecurrentFFNet model level
             and is called during the training process.
         """
-        settings = Settings()
+        settings = Settings.new()
 
         for epoch in range(0, settings.model.epochs):
             logging.info("Epoch: " + str(epoch))

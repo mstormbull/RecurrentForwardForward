@@ -33,12 +33,15 @@ class Settings(metaclass=Singleton):
         def __init__(self, device_dict):
             self.device = torch.device(device_dict['device'])
 
-    def __init__(self):
-        args = get_arguments()
-        if args.config_file is not None:
-            config = toml.load(args.config_file)
-        else:
-            config = toml.load(CONFIG_FILE)
-
+    def __init__(self, config: dict[str, any]):
         self.model = self.Model(config['model'])
         self.device = self.Device(config['device'])
+
+    def from_config_file(path: str):
+        config = toml.load(path)
+        return Settings(config)
+
+    def new():
+        args = get_arguments()
+        config_file = args.config_file if args.config_file != None else CONFIG_FILE
+        return Settings.from_config_file(config_file)

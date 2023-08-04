@@ -51,7 +51,7 @@ class HiddenLayer(nn.Module):
             damping_factor):
         super(HiddenLayer, self).__init__()
 
-        self.settings = Settings()
+        self.settings = Settings.new()
 
         self.train_activations_dim = (train_batch_size, size)
         self.test_activations_dim = (test_batch_size, size)
@@ -163,7 +163,7 @@ class HiddenLayer(nn.Module):
         self.next_layer = next_layer
 
     def train(self, optimizer, input_data, label_data, should_damp):
-        settings = Settings()
+        settings = Settings.new()
 
         optimizer.zero_grad()
 

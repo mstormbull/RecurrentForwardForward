@@ -273,7 +273,7 @@ def MNIST_loaders(train_batch_size, test_batch_size):
 
 
 if __name__ == "__main__":
-    settings = Settings()
+    settings = Settings.new()
     data_config = DataConfig(
         INPUT_SIZE,
         NUM_CLASSES,

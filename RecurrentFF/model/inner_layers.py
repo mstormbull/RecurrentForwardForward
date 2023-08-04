@@ -14,11 +14,11 @@ class InnerLayers(nn.Module):
     def __init__(self, layers):
         super(InnerLayers, self).__init__()
 
-        self.settings = Settings()
+        self.settings = Settings.new()
 
         self.layers = layers
         self.optimizer = RMSprop(
-            self.parameters(), lr=self.settings.model.learning_rate)
+            self.parameters(), lr=self.settings.model.learning_rate, momentum=.5)
 
     def advance_layers_train(self, input_data, label_data, should_damp):
         """

@@ -15,7 +15,7 @@ def set_logging():
 
 
 def standardize_layer_activations(layer_activations):
-    settings = Settings()
+    settings = Settings.new()
 
     # Compute mean and standard deviation for prev_layer
     prev_layer_mean = layer_activations.mean(

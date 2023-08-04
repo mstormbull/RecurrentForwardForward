@@ -10,7 +10,8 @@ from RecurrentFF.model.inner_layers import InnerLayers
 from RecurrentFF.util import DataConfig, LatentAverager, TrainLabelData, layer_activations_to_goodness, ForwardMode
 from RecurrentFF.settings import Settings
 
-def formulate_incorrect_class(prob_tensor: torch.Tensor, correct_onehot_tensor: torch.Tensor) -> torch.Tensor:
+
+def formulate_incorrect_class(prob_tensor: torch.Tensor, correct_onehot_tensor: torch.Tensor, settings: Settings) -> torch.Tensor:
     """
     Finds the one-hot encoded class with a probabilistic selection that is not the
     correct class from prob_tensor.
@@ -25,17 +26,17 @@ def formulate_incorrect_class(prob_tensor: torch.Tensor, correct_onehot_tensor: 
         torch.Tensor: One-hot encoded tensor of shape [batch_size, classes]
             with the selected incorrect class.
     """
-    settings = Settings()
-
     # Compute the indices of the maximum probability for each sample
     max_prob_indices = prob_tensor.argmax(dim=1)
-    
+
     # Compute the indices of the correct class for each sample
     correct_indices = correct_onehot_tensor.argmax(dim=1)
-    
+
     # Compute the percentage where the maximum probability index matches the correct class index
-    percentage_matching = (max_prob_indices == correct_indices).float().mean().item() * 100
-    print(f"Percentage of entries with highest probability corresponding to correct class: {percentage_matching}%")
+    percentage_matching = (
+        max_prob_indices == correct_indices).float().mean().item() * 100
+    logging.info(
+        f"Latent classifier accuracy: {percentage_matching}%")
 
     # Zero out the probabilities corresponding to the correct class
     masked_prob_tensor = prob_tensor * (1 - correct_onehot_tensor)
@@ -44,13 +45,14 @@ def formulate_incorrect_class(prob_tensor: torch.Tensor, correct_onehot_tensor: 
     cumulative_prob = torch.cumsum(masked_prob_tensor, dim=1)
 
     # Generate random numbers for the entire batch
-    rand_nums = torch.rand(cumulative_prob.size(0), 1).to(device=settings.device.device)
+    rand_nums = torch.rand(cumulative_prob.size(
+        0), 1).to(device=settings.device.device)
 
     # Expand random numbers to the same shape as cumulative_prob for comparison
     rand_nums_expanded = rand_nums.expand_as(cumulative_prob)
 
     # Create a mask that identifies where the random numbers are less than the cumulative probabilities
-    mask = rand_nums_expanded < cumulative_prob
+    mask = (rand_nums_expanded < cumulative_prob).int()
 
     # Use argmax() to find the index of the first True value in each row
     selected_indices = mask.argmax(dim=1)
@@ -59,10 +61,12 @@ def formulate_incorrect_class(prob_tensor: torch.Tensor, correct_onehot_tensor: 
     no_selection_mask = mask.sum(dim=1) == 0
 
     # For the cases where no selection was made, select the index of the first non-zero cumulative probability
-    selected_indices[no_selection_mask] = (cumulative_prob[no_selection_mask] > 0).argmax(dim=1)
+    selected_indices[no_selection_mask] = (
+        cumulative_prob[no_selection_mask] > 0).int().argmax(dim=1)
 
     # Create a tensor with zeros and the same shape as the prob_tensor
-    result_onehot_tensor = torch.zeros_like(prob_tensor).to(device=settings.device.device)
+    result_onehot_tensor = torch.zeros_like(
+        prob_tensor).to(device=settings.device.device)
 
     # Batch-wise assignment of 1 to the selected indices
     result_onehot_tensor.scatter_(1, selected_indices.unsqueeze(1), 1)
@@ -72,7 +76,8 @@ def formulate_incorrect_class(prob_tensor: torch.Tensor, correct_onehot_tensor: 
     correct = (selected_indices == max_indices_correct).sum().item()
     incorrect = prob_tensor.size(0) - correct
 
-    logging.info("optimization classifier accuracy: " + str(correct / (correct + incorrect)))
+    logging.info("optimization classifier accuracy: " +
+                 str(correct / (correct + incorrect)))
 
     return result_onehot_tensor
 
@@ -81,7 +86,7 @@ class StaticSingleClassProcessor(DataScenarioProcessor):
     def __init__(self, inner_layers: InnerLayers, data_config: DataConfig):
         self.inner_layers = inner_layers
         self.data_config = data_config
-        self.settings = Settings()
+        self.settings = Settings.new()
 
         self.classification_weights = nn.Linear(
             sum(self.settings.model.hidden_sizes), self.data_config.num_classes).to(device=self.settings.device.device)
@@ -148,11 +153,13 @@ class StaticSingleClassProcessor(DataScenarioProcessor):
         class_logits = F.linear(latents, self.classification_weights.weight)
         class_probabilities = F.softmax(class_logits, dim=-1)
         negative_labels = formulate_incorrect_class(
-            class_probabilities, input_labels.pos_labels[0])
+            class_probabilities, input_labels.pos_labels[0], self.settings)
 
         frames = input_labels.pos_labels.shape[0]
-        negative_labels = negative_labels.unsqueeze(0)  # Add a new dimension at the beginning
-        input_labels.neg_labels = negative_labels.repeat(frames, 1, 1)  # Repeat along the new dimension
+        negative_labels = negative_labels.unsqueeze(
+            0)  # Add a new dimension at the beginning
+        input_labels.neg_labels = negative_labels.repeat(
+            frames, 1, 1)  # Repeat along the new dimension
 
     def brute_force_predict(self, test_loader, limit_batches=None):
         """
