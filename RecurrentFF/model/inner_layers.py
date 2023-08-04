@@ -2,7 +2,7 @@ import logging
 
 
 from torch import nn
-from torch.optim import Adam
+from torch.optim import Adam, RMSprop
 
 from RecurrentFF.settings import (
     Settings,
@@ -17,7 +17,7 @@ class InnerLayers(nn.Module):
         self.settings = Settings()
 
         self.layers = layers
-        self.optimizer = Adam(
+        self.optimizer = RMSprop(
             self.parameters(), lr=self.settings.model.learning_rate)
 
     def advance_layers_train(self, input_data, label_data, should_damp):

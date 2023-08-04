@@ -22,6 +22,17 @@ from RecurrentFF.settings import (
 )
 
 
+# TODO: store activations
+# TODO: add conv layer at beginning to use receptive fields
+# TODO: try sigmoid activation function
+# TODO: use rms prop (emphasis on lateral connections)
+# TODO: plumb optimizer into `HiddenLayer`
+# TODO: different learning rates for lateral connections
+# TODO: initialize weights (division by n, number of inputs) (lora activation)
+# TODO: threshold a parameter?
+# TODO: average activation
+# TODO: look at Hinton norm
+# TODO: log activations (variance is much bigger than average, then relu is not good - maybe try leaky relu?)
 class RecurrentFFNet(nn.Module):
     """
     Implements a Recurrent Forward-Forward Network (RecurrentFFNet) based on
@@ -150,6 +161,7 @@ class RecurrentFFNet(nn.Module):
 
         self.inner_layers.reset_activations(True)
 
+        # TODO: zero label
         for preinit_step in range(0, len(self.inner_layers)):
             logging.debug("Preinitialization step: " +
                           str(preinit_step))

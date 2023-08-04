@@ -197,9 +197,6 @@ class HiddenLayer(nn.Module):
         pos_goodness = layer_activations_to_goodness(pos_activations)
         neg_goodness = layer_activations_to_goodness(neg_activations)
 
-        logging.debug("pos goodness: " + str(pos_goodness))
-        logging.debug("neg goodness: " + str(neg_goodness))
-
         # Loss function equivelent to:
         # L = log(1 + exp(((-p + 2) + (n - 2))/2)
         layer_loss = F.softplus(torch.cat([

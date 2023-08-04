@@ -27,6 +27,16 @@ def formulate_incorrect_class(prob_tensor: torch.Tensor, correct_onehot_tensor: 
     """
     settings = Settings()
 
+    # Compute the indices of the maximum probability for each sample
+    max_prob_indices = prob_tensor.argmax(dim=1)
+    
+    # Compute the indices of the correct class for each sample
+    correct_indices = correct_onehot_tensor.argmax(dim=1)
+    
+    # Compute the percentage where the maximum probability index matches the correct class index
+    percentage_matching = (max_prob_indices == correct_indices).float().mean().item() * 100
+    print(f"Percentage of entries with highest probability corresponding to correct class: {percentage_matching}%")
+
     # Zero out the probabilities corresponding to the correct class
     masked_prob_tensor = prob_tensor * (1 - correct_onehot_tensor)
 
@@ -39,8 +49,17 @@ def formulate_incorrect_class(prob_tensor: torch.Tensor, correct_onehot_tensor: 
     # Expand random numbers to the same shape as cumulative_prob for comparison
     rand_nums_expanded = rand_nums.expand_as(cumulative_prob)
 
-    # Find the first index where each random number is less than the cumulative probability
-    selected_indices = (rand_nums_expanded < cumulative_prob).argmax(dim=1)
+    # Create a mask that identifies where the random numbers are less than the cumulative probabilities
+    mask = rand_nums_expanded < cumulative_prob
+
+    # Use argmax() to find the index of the first True value in each row
+    selected_indices = mask.argmax(dim=1)
+
+    # Identify where the random number is greater than all cumulative probabilities
+    no_selection_mask = mask.sum(dim=1) == 0
+
+    # For the cases where no selection was made, select the index of the first non-zero cumulative probability
+    selected_indices[no_selection_mask] = (cumulative_prob[no_selection_mask] > 0).argmax(dim=1)
 
     # Create a tensor with zeros and the same shape as the prob_tensor
     result_onehot_tensor = torch.zeros_like(prob_tensor).to(device=settings.device.device)
@@ -52,17 +71,6 @@ def formulate_incorrect_class(prob_tensor: torch.Tensor, correct_onehot_tensor: 
     max_indices_correct = correct_onehot_tensor.argmax(dim=1)
     correct = (selected_indices == max_indices_correct).sum().item()
     incorrect = prob_tensor.size(0) - correct
-
-    for i in range(0, selected_indices.shape[0]):
-        if selected_indices[i].equal(max_indices_correct[i]):
-            logging.debug("correct class selected")
-            print(correct_onehot_tensor[i])
-            print(prob_tensor[i])
-            print(cumulative_prob[i])
-            print(selected_indices[i])
-            print(max_indices_correct[i])
-            print(rand_nums_expanded[i])
-            input()
 
     logging.info("optimization classifier accuracy: " + str(correct / (correct + incorrect)))
 
@@ -143,7 +151,8 @@ class StaticSingleClassProcessor(DataScenarioProcessor):
             class_probabilities, input_labels.pos_labels[0])
 
         frames = input_labels.pos_labels.shape[0]
-        input_labels.neg_labels = negative_labels.repeat(frames, 1)
+        negative_labels = negative_labels.unsqueeze(0)  # Add a new dimension at the beginning
+        input_labels.neg_labels = negative_labels.repeat(frames, 1, 1)  # Repeat along the new dimension
 
     def brute_force_predict(self, test_loader, limit_batches=None):
         """
