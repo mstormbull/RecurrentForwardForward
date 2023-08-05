@@ -4,13 +4,14 @@ from torchvision.datasets import MNIST
 from torchvision.transforms import Compose, ToTensor, Normalize, Lambda
 import wandb
 
-from RecurrentFF.util import DataConfig, TrainInputData, TrainLabelData, SingleStaticClassTestData, set_logging
+from RecurrentFF.model.data_scenario.static_single_class import SingleStaticClassTestData
+from RecurrentFF.util import DataConfig, TrainInputData, TrainLabelData, set_logging
 from RecurrentFF.model.model import RecurrentFFNet
 from RecurrentFF.settings import Settings
 
 INPUT_SIZE = 784
 NUM_CLASSES = 10
-TRAIN_BATCH_SIZE = 5000
+TRAIN_BATCH_SIZE = 20000
 TEST_BATCH_SIZE = 5000
 ITERATIONS = 10
 FOCUS_ITERATION_NEG_OFFSET = 1

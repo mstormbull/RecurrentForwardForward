@@ -6,8 +6,9 @@ import wandb
 import numpy as np
 
 from RecurrentFF.model.model import RecurrentFFNet
+from RecurrentFF.model.data_scenario.static_single_class import SingleStaticClassTestData
 from RecurrentFF.settings import Settings
-from RecurrentFF.util import DataConfig, SingleStaticClassTestData, TrainInputData, TrainLabelData, set_logging
+from RecurrentFF.util import DataConfig, TrainInputData, TrainLabelData, set_logging
 
 INPUT_SIZE = 4
 NUM_CLASSES = 10
@@ -273,7 +274,7 @@ def MNIST_loaders(train_batch_size, test_batch_size):
 
 
 if __name__ == "__main__":
-    settings = Settings()
+    settings = Settings.new()
     data_config = DataConfig(
         INPUT_SIZE,
         NUM_CLASSES,

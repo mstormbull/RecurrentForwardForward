@@ -1,4 +1,4 @@
-name: "Smoke Test"
+name: "Unit Tests"
 
 on:
   pull_request:
@@ -27,4 +27,4 @@ jobs:
           pip install -r test/pip/requirements.txt
 
       - name: Smoke Test
-        run: ./test/scripts/smoke.sh
+        run: ./test/scripts/unit.sh
