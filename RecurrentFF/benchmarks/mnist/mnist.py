@@ -11,7 +11,7 @@ from RecurrentFF.settings import Settings
 
 INPUT_SIZE = 784
 NUM_CLASSES = 10
-TRAIN_BATCH_SIZE = 20000
+TRAIN_BATCH_SIZE = 500
 TEST_BATCH_SIZE = 5000
 ITERATIONS = 10
 FOCUS_ITERATION_NEG_OFFSET = 1
@@ -195,7 +195,7 @@ def convert_to_timestep_dims(data):
 
 
 if __name__ == "__main__":
-    settings = Settings()
+    settings = Settings.new()
     data_config = DataConfig(
         INPUT_SIZE,
         NUM_CLASSES,
@@ -219,13 +219,7 @@ if __name__ == "__main__":
         config={
             "architecture": "Recurrent-FF",
             "dataset": "MNIST",
-            "epochs": settings.model.epochs,
-            "learning_rate": settings.model.learning_rate,
-            "layers": str(settings.model.hidden_sizes),
-            "iterations": ITERATIONS,
-            "loss_threshold": settings.model.loss_threshold,
-            "damping_factor": settings.model.damping_factor,
-            "epsilon": settings.model.epsilon,
+            "settings": settings.dict(),
         }
     )
 
