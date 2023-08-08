@@ -32,7 +32,8 @@ from RecurrentFF.settings import (
 # TODO: threshold a parameter?
 # TODO: average activation
 # TODO: look at Hinton norm
-# TODO: log activations (variance is much bigger than average, then relu is not good - maybe try leaky relu?)
+# TODO: log activations (variance is much bigger than average, then relu
+# is not good - maybe try leaky relu?)
 class RecurrentFFNet(nn.Module):
     """
     Implements a Recurrent Forward-Forward Network (RecurrentFFNet) based on
@@ -61,19 +62,19 @@ class RecurrentFFNet(nn.Module):
     architecture.
     """
 
-    def __init__(self, data_config):
+    def __init__(self, settings):
         logging.info("Initializing network")
         super(RecurrentFFNet, self).__init__()
 
-        self.settings = Settings.new()
-        self.data_config = data_config
+        self.settings = settings
 
         inner_layers = nn.ModuleList()
-        prev_size = data_config.data_size
+        prev_size = self.settings.data_config.data_size
         for size in self.settings.model.hidden_sizes:
             hidden_layer = HiddenLayer(
-                data_config.train_batch_size,
-                data_config.test_batch_size,
+                self.settings,
+                self.settings.data_config.train_batch_size,
+                self.settings.data_config.test_batch_size,
                 prev_size,
                 size,
                 self.settings.model.damping_factor)
@@ -81,7 +82,7 @@ class RecurrentFFNet(nn.Module):
             prev_size = size
 
         self.output_layer = OutputLayer(
-            self.settings.model.hidden_sizes[-1], self.data_config.num_classes)
+            self.settings.model.hidden_sizes[-1], self.settings.data_config.num_classes)
 
         # attach layers to each other
         for i, hidden_layer in enumerate(inner_layers):
@@ -94,12 +95,12 @@ class RecurrentFFNet(nn.Module):
             else:
                 hidden_layer.set_next_layer(self.output_layer)
 
-        self.inner_layers = InnerLayers(inner_layers)
+        self.inner_layers = InnerLayers(self.settings, inner_layers)
 
         # when we eventually support changing/multiclass scenarios this will be
         # configurable
         self.processor = StaticSingleClassProcessor(
-            self.inner_layers, data_config)
+            self.inner_layers, self.settings)
 
         logging.info("Finished initializing network")
 
@@ -132,9 +133,7 @@ class RecurrentFFNet(nn.Module):
             layer's activations into a 'goodness' score. This function operates on the RecurrentFFNet model level
             and is called during the training process.
         """
-        settings = Settings.new()
-
-        for epoch in range(0, settings.model.epochs):
+        for epoch in range(0, self.settings.model.epochs):
             logging.info("Epoch: " + str(epoch))
 
             for batch_num, (input_data, label_data) in enumerate(train_loader):
@@ -152,8 +151,12 @@ class RecurrentFFNet(nn.Module):
             accuracy = self.processor.brute_force_predict(
                 test_loader, 1)
 
-            self.__log_metrics(accuracy, average_layer_loss,
-                               pos_goodness_per_layer, neg_goodness_per_layer, epoch)
+            self.__log_metrics(
+                accuracy,
+                average_layer_loss,
+                pos_goodness_per_layer,
+                neg_goodness_per_layer,
+                epoch)
 
     def __train_batch(self, batch_num, input_data, label_data):
         logging.info("Batch: " + str(batch_num))
@@ -195,8 +198,13 @@ class RecurrentFFNet(nn.Module):
             logging.debug("Average layer loss: " +
                           str(average_layer_loss))
 
-            if iteration >= self.data_config.focus_iteration_neg_offset and \
-                    iteration <= self.data_config.focus_iteration_pos_offset:
+            lower_iteration_threshold = iterations // 2 - \
+                iterations // 10
+            upper_iteration_threshold = iterations // 2 + \
+                iterations // 10
+
+            if iteration >= lower_iteration_threshold and \
+                    iteration <= upper_iteration_threshold:
                 pos_goodness_per_layer.append([layer_activations_to_goodness(
                     layer.pos_activations.current).mean() for layer in self.inner_layers])
                 neg_goodness_per_layer.append([layer_activations_to_goodness(

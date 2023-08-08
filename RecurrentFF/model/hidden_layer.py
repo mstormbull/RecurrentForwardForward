@@ -44,6 +44,7 @@ class HiddenLayer(nn.Module):
 
     def __init__(
             self,
+            settings,
             train_batch_size,
             test_batch_size,
             prev_size,
@@ -51,7 +52,7 @@ class HiddenLayer(nn.Module):
             damping_factor):
         super(HiddenLayer, self).__init__()
 
-        self.settings = Settings.new()
+        self.settings = settings
 
         self.train_activations_dim = (train_batch_size, size)
         self.test_activations_dim = (test_batch_size, size)
@@ -163,8 +164,6 @@ class HiddenLayer(nn.Module):
         self.next_layer = next_layer
 
     def train(self, optimizer, input_data, label_data, should_damp):
-        settings = Settings.new()
-
         optimizer.zero_grad()
 
         pos_activations = None
@@ -200,8 +199,8 @@ class HiddenLayer(nn.Module):
         # Loss function equivelent to:
         # L = log(1 + exp(((-p + 2) + (n - 2))/2)
         layer_loss = F.softplus(torch.cat([
-            (-1 * pos_goodness) + settings.model.loss_threshold,
-            neg_goodness - settings.model.loss_threshold
+            (-1 * pos_goodness) + self.settings.model.loss_threshold,
+            neg_goodness - self.settings.model.loss_threshold
         ])).mean()
 
         layer_loss.backward()
@@ -284,20 +283,26 @@ class HiddenLayer(nn.Module):
             prev_act = prev_act.detach()
 
             prev_layer_stdized = standardize_layer_activations(
-                prev_layer_prev_timestep_activations)
+                prev_layer_prev_timestep_activations, self.settings.model.epsilon)
             next_layer_stdized = standardize_layer_activations(
-                next_layer_prev_timestep_activations)
+                next_layer_prev_timestep_activations, self.settings.model.epsilon)
 
-            new_activation = F.relu(
+            summation =  \
                 F.linear(
                     prev_layer_stdized,
-                    self.forward_linear.weight) +
+                    self.forward_linear.weight) + \
                 F.linear(
                     next_layer_stdized,
-                    self.next_layer.backward_linear.weight) +
+                    self.next_layer.backward_linear.weight) + \
                 F.linear(
                     prev_act,
-                    self.lateral_linear.weight))
+                    self.lateral_linear.weight)
+
+            if self.settings.model.ff_activation == "relu":
+                new_activation = F.relu(summation)
+            elif self.settings.model.ff_activation == "leaky_relu":
+                new_activation = F.leaky_relu(summation)
+
             if should_damp:
                 old_activation = new_activation
                 new_activation = (1 - self.damping_factor) * \
@@ -315,16 +320,21 @@ class HiddenLayer(nn.Module):
                 prev_act = self.predict_activations.previous
             prev_act = prev_act.detach()
 
-            new_activation = F.relu(
+            summation = \
                 F.linear(
                     data,
-                    self.forward_linear.weight) +
+                    self.forward_linear.weight) + \
                 F.linear(
                     labels,
-                    self.next_layer.backward_linear.weight) +
+                    self.next_layer.backward_linear.weight) + \
                 F.linear(
                     prev_act,
-                    self.lateral_linear.weight))
+                    self.lateral_linear.weight)
+
+            if self.settings.model.ff_activation == "relu":
+                new_activation = F.relu(summation)
+            elif self.settings.model.ff_activation == "leaky_relu":
+                new_activation = F.leaky_relu(summation)
 
             if should_damp:
                 old_activation = new_activation
@@ -349,18 +359,23 @@ class HiddenLayer(nn.Module):
 
             # Apply standardization
             next_layer_stdized = standardize_layer_activations(
-                next_layer_prev_timestep_activations)
+                next_layer_prev_timestep_activations, self.settings.model.epsilon)
 
-            new_activation = F.relu(
+            summation = \
                 F.linear(
                     data,
-                    self.forward_linear.weight) +
+                    self.forward_linear.weight) + \
                 F.linear(
                     next_layer_stdized,
-                    self.next_layer.backward_linear.weight) +
+                    self.next_layer.backward_linear.weight) + \
                 F.linear(
                     prev_act,
-                    self.lateral_linear.weight))
+                    self.lateral_linear.weight)
+
+            if self.settings.model.ff_activation == "relu":
+                new_activation = F.relu(summation)
+            elif self.settings.model.ff_activation == "leaky_relu":
+                new_activation = F.leaky_relu(summation)
 
             if should_damp:
                 old_activation = new_activation
@@ -385,18 +400,23 @@ class HiddenLayer(nn.Module):
 
             # Apply standardization
             prev_layer_stdized = standardize_layer_activations(
-                prev_layer_prev_timestep_activations)
+                prev_layer_prev_timestep_activations, self.settings.model.epsilon)
 
-            new_activation = F.relu(
+            summation = \
                 F.linear(
                     prev_layer_stdized,
-                    self.forward_linear.weight) +
+                    self.forward_linear.weight) + \
                 F.linear(
                     labels,
-                    self.next_layer.backward_linear.weight) +
+                    self.next_layer.backward_linear.weight) + \
                 F.linear(
                     prev_act,
-                    self.lateral_linear.weight))
+                    self.lateral_linear.weight)
+
+            if self.settings.model.ff_activation == "relu":
+                new_activation = F.relu(summation)
+            elif self.settings.model.ff_activation == "leaky_relu":
+                new_activation = F.leaky_relu(summation)
 
             if should_damp:
                 old_activation = new_activation
