@@ -33,6 +33,14 @@ class ClassifierAdam(BaseModel):
     learning_rate: float
 
 
+class FfAdadelta(BaseModel):
+    learning_rate: float
+
+
+class ClassifierAdadelta(BaseModel):
+    learning_rate: float
+
+
 class Model(BaseModel):
     hidden_sizes: list
     epochs: int
@@ -48,10 +56,12 @@ class Model(BaseModel):
     ff_optimizer: str
     ff_rmsprop: FfRmsprop = None
     ff_adam: FfAdam = None
+    ff_adadelta: FfAdadelta = None
 
     classifier_optimizer: str
     classifier_rmsprop: ClassifierRmsprop = None
     classifier_adam: ClassifierAdam = None
+    classifier_adadelta: FfAdadelta = None
 
 
 class Device(BaseModel):
@@ -70,12 +80,20 @@ class Settings(BaseModel):
 
         if model['ff_optimizer'] == "rmsprop":
             model['ff_rmsprop'] = FfRmsprop(**model['ff_rmsprop'])
-            model['classifier_rmsprop'] = ClassifierRmsprop(
-                **model['classifier_rmsprop'])
         elif model['ff_optimizer'] == "adam":
             model['ff_adam'] = FfAdam(**model['ff_adam'])
+        elif model['ff_optimizer'] == "adadelta":
+            model['ff_adadelta'] = FfAdadelta(**model['ff_adadelta'])
+
+        if model['classifier_optimizer'] == "rmsprop":
+            model['classifier_rmsprop'] = ClassifierRmsprop(
+                **model['classifier_rmsprop'])
+        elif model['classifier_optimizer'] == "adam":
             model['classifier_adam'] = ClassifierAdam(
                 **model['classifier_adam'])
+        elif model['classifier_optimizer'] == "adadelta":
+            model['classifier_adadelta'] = FfAdadelta(
+                **model['classifier_adadelta'])
 
         return cls(model=Model(**model), device=Device(**config['device']))
 

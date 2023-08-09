@@ -118,6 +118,10 @@ class StaticSingleClassProcessor(DataScenarioProcessor):
             self.optimizer = torch.optim.Adam(
                 self.classification_weights.parameters(),
                 lr=self.settings.model.classifier_adam.learning_rate)
+        elif self.settings.model.classifier_optimizer == "adadelta":
+            self.optimizer = torch.optim.Adadelta(
+                self.classification_weights.parameters(),
+                lr=self.settings.model.classifier_adadelta.learning_rate)
 
     def train_class_predictor_from_latents(
             self, latents: torch.Tensor, labels: torch.Tensor):
@@ -179,9 +183,6 @@ class StaticSingleClassProcessor(DataScenarioProcessor):
                 be replaced.
         """
         latents = self.__retrieve_latents__(input_batch, input_labels)
-
-        print(latents.shape)
-        print(self.classification_weights.weight.shape)
 
         class_logits = F.linear(latents, self.classification_weights.weight)
         class_probabilities = F.softmax(class_logits, dim=-1)
