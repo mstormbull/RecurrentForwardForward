@@ -4,11 +4,12 @@ import logging
 import torch
 from torch import nn
 from torch.nn import functional as F
+from torch.optim import RMSprop, Adam, Adadelta
 
 from RecurrentFF.util import (
     Activations,
     ForwardMode,
-    layer_activations_to_goodness,
+    layer_activations_to_badness,
     standardize_layer_activations,
 )
 from RecurrentFF.settings import (
@@ -22,9 +23,9 @@ class HiddenLayer(nn.Module):
     inspiration drawn from Boltzmann Machines and Noise Contrastive Estimation.
     This network design is characterized by two distinct forward passes, each
     with specific objectives: one is dedicated to processing positive ("real")
-    data with the aim of enhancing the 'goodness' across every hidden layer,
+    data with the aim of lowering the 'badness' across every hidden layer,
     while the other is tasked with processing negative data and adjusting the
-    weights to reduce the 'goodness' metric.
+    weights to increase the 'badness' metric.
 
     The HiddenLayer is essentially a node within this network, with possible
     connections to both preceding and succeeding layers, depending on its
@@ -68,8 +69,24 @@ class HiddenLayer(nn.Module):
         self.backward_linear = nn.Linear(size, prev_size)
         self.lateral_linear = nn.Linear(size, size)
 
+        # Initialize the lateral weights to be the identity matrix
+        nn.init.eye_(self.lateral_linear.weight)
+
         self.previous_layer = None
         self.next_layer = None
+
+        if self.settings.model.ff_optimizer == "adam":
+            self.optimizer = Adam(self.parameters(),
+                                  lr=self.settings.model.ff_adam.learning_rate)
+        elif self.settings.model.ff_optimizer == "rmsprop":
+            self.optimizer = RMSprop(
+                self.parameters(),
+                lr=self.settings.model.ff_rmsprop.learning_rate,
+                momentum=self.settings.model.ff_rmsprop.momentum)
+        elif self.settings.model.ff_optimizer == "adadelta":
+            self.optimizer = Adadelta(
+                self.parameters(),
+                lr=self.settings.model.ff_adadelta.learning_rate)
 
     def _apply(self, fn):
         """
@@ -163,8 +180,8 @@ class HiddenLayer(nn.Module):
     def set_next_layer(self, next_layer):
         self.next_layer = next_layer
 
-    def train(self, optimizer, input_data, label_data, should_damp):
-        optimizer.zero_grad()
+    def train(self, input_data, label_data, should_damp):
+        self.optimizer.zero_grad()
 
         pos_activations = None
         neg_activations = None
@@ -193,20 +210,20 @@ class HiddenLayer(nn.Module):
             neg_activations = self.forward(
                 ForwardMode.NegativeData, None, None, should_damp)
 
-        pos_goodness = layer_activations_to_goodness(pos_activations)
-        neg_goodness = layer_activations_to_goodness(neg_activations)
+        pos_badness = layer_activations_to_badness(pos_activations)
+        neg_badness = layer_activations_to_badness(neg_activations)
 
         # Loss function equivelent to:
         # L = log(1 + exp(((-p + 2) + (n - 2))/2)
         layer_loss = F.softplus(torch.cat([
-            (-1 * pos_goodness) + self.settings.model.loss_threshold,
-            neg_goodness - self.settings.model.loss_threshold
+            (-1 * neg_badness) + self.settings.model.loss_threshold,
+            pos_badness - self.settings.model.loss_threshold
         ])).mean()
 
         layer_loss.backward()
 
-        optimizer.step()
-        optimizer.zero_grad()
+        self.optimizer.step()
+        self.optimizer.zero_grad()
 
         return layer_loss
 
@@ -287,21 +304,16 @@ class HiddenLayer(nn.Module):
             next_layer_stdized = standardize_layer_activations(
                 next_layer_prev_timestep_activations, self.settings.model.epsilon)
 
-            summation =  \
-                F.linear(
+            new_activation =  \
+                F.relu(F.linear(
                     prev_layer_stdized,
-                    self.forward_linear.weight) + \
-                F.linear(
+                    self.forward_linear.weight)) + \
+                -1 * F.relu(F.linear(
                     next_layer_stdized,
-                    self.next_layer.backward_linear.weight) + \
-                F.linear(
+                    self.next_layer.backward_linear.weight)) + \
+                F.leaky_relu(F.linear(
                     prev_act,
-                    self.lateral_linear.weight)
-
-            if self.settings.model.ff_activation == "relu":
-                new_activation = F.relu(summation)
-            elif self.settings.model.ff_activation == "leaky_relu":
-                new_activation = F.leaky_relu(summation)
+                    self.lateral_linear.weight))
 
             if should_damp:
                 old_activation = new_activation
@@ -320,21 +332,16 @@ class HiddenLayer(nn.Module):
                 prev_act = self.predict_activations.previous
             prev_act = prev_act.detach()
 
-            summation = \
-                F.linear(
+            new_activation = \
+                F.relu(F.linear(
                     data,
-                    self.forward_linear.weight) + \
-                F.linear(
+                    self.forward_linear.weight)) + \
+                -1 * F.relu(F.linear(
                     labels,
-                    self.next_layer.backward_linear.weight) + \
-                F.linear(
+                    self.next_layer.backward_linear.weight)) + \
+                F.leaky_relu(F.linear(
                     prev_act,
-                    self.lateral_linear.weight)
-
-            if self.settings.model.ff_activation == "relu":
-                new_activation = F.relu(summation)
-            elif self.settings.model.ff_activation == "leaky_relu":
-                new_activation = F.leaky_relu(summation)
+                    self.lateral_linear.weight))
 
             if should_damp:
                 old_activation = new_activation
@@ -361,21 +368,16 @@ class HiddenLayer(nn.Module):
             next_layer_stdized = standardize_layer_activations(
                 next_layer_prev_timestep_activations, self.settings.model.epsilon)
 
-            summation = \
-                F.linear(
+            new_activation = \
+                F.relu(F.linear(
                     data,
-                    self.forward_linear.weight) + \
-                F.linear(
+                    self.forward_linear.weight)) + \
+                -1 * F.relu(F.linear(
                     next_layer_stdized,
-                    self.next_layer.backward_linear.weight) + \
-                F.linear(
+                    self.next_layer.backward_linear.weight)) + \
+                F.leaky_relu(F.linear(
                     prev_act,
-                    self.lateral_linear.weight)
-
-            if self.settings.model.ff_activation == "relu":
-                new_activation = F.relu(summation)
-            elif self.settings.model.ff_activation == "leaky_relu":
-                new_activation = F.leaky_relu(summation)
+                    self.lateral_linear.weight))
 
             if should_damp:
                 old_activation = new_activation
@@ -402,21 +404,16 @@ class HiddenLayer(nn.Module):
             prev_layer_stdized = standardize_layer_activations(
                 prev_layer_prev_timestep_activations, self.settings.model.epsilon)
 
-            summation = \
-                F.linear(
+            new_activation = \
+                F.relu(F.linear(
                     prev_layer_stdized,
-                    self.forward_linear.weight) + \
-                F.linear(
+                    self.forward_linear.weight)) + \
+                -1 * F.relu(F.linear(
                     labels,
-                    self.next_layer.backward_linear.weight) + \
-                F.linear(
+                    self.next_layer.backward_linear.weight)) + \
+                F.leaky_relu(F.linear(
                     prev_act,
-                    self.lateral_linear.weight)
-
-            if self.settings.model.ff_activation == "relu":
-                new_activation = F.relu(summation)
-            elif self.settings.model.ff_activation == "leaky_relu":
-                new_activation = F.leaky_relu(summation)
+                    self.lateral_linear.weight))
 
             if should_damp:
                 old_activation = new_activation

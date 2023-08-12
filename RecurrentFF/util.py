@@ -86,43 +86,12 @@ class ForwardMode(Enum):
     PredictData = 3
 
 
-def activations_to_goodness(activations):
+def layer_activations_to_badness(layer_activations):
     """
-    Computes the 'goodness' of activations for each layer in a neural network by
-    taking the mean of the squared values.
-
-    'Goodness' in this context refers to the average squared activation value.
-    This function is designed to work with PyTorch tensors, which represent
-    layers in a neural network.
-
-    Args:
-        activations (list of torch.Tensor): A list of tensors representing
-        activations from each layer of a neural network. Each tensor in the list
-        corresponds to one layer's activations, and has shape (batch_size,
-        num_activations), where batch_size is the number of samples processed
-        together, and num_activations is the number of neurons in the layer.
-
-    Returns:
-        list of torch.Tensor: A list of tensors, each tensor corresponding to
-        the 'goodness' (mean of the squared activations) of each layer in the
-        input. Each tensor in the output list has shape (batch_size,), since the
-        mean is taken over the activation values for each sample in the batch.
-    """
-    goodness = []
-    for act in activations:
-        goodness_for_layer = torch.mean(
-            torch.square(act), dim=1)
-        goodness.append(goodness_for_layer)
-
-    return goodness
-
-
-def layer_activations_to_goodness(layer_activations):
-    """
-    Computes the 'goodness' of activations for a given layer in a neural network
+    Computes the 'badness' of activations for a given layer in a neural network
     by taking the mean of the squared values.
 
-    'Goodness' in this context refers to the average squared activation value.
+    'Badness' in this context refers to the average squared activation value.
     This function is designed to work with PyTorch tensors, which represent the
     layer's activations.
 
@@ -133,15 +102,15 @@ def layer_activations_to_goodness(layer_activations):
         together, and num_activations is the number of neurons in the layer.
 
     Returns:
-        torch.Tensor: A tensor corresponding to the 'goodness' (mean of the
+        torch.Tensor: A tensor corresponding to the 'badness' (mean of the
         squared activations) of the given layer. The output tensor has shape
         (batch_size,), since the mean is taken over the activation values for
         each sample in the batch.
     """
-    goodness_for_layer = torch.mean(
+    badness_for_layer = torch.mean(
         torch.square(layer_activations), dim=1)
 
-    return goodness_for_layer
+    return badness_for_layer
 
 
 class LatentAverager:

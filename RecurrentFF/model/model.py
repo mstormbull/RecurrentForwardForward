@@ -15,7 +15,7 @@ from RecurrentFF.util import (
     ForwardMode,
     OutputLayer,
     LatentAverager,
-    layer_activations_to_goodness,
+    layer_activations_to_badness,
 )
 from RecurrentFF.settings import (
     Settings,
@@ -33,7 +33,7 @@ from RecurrentFF.settings import (
 # TODO: average activation
 # TODO: look at Hinton norm
 # TODO: log activations (variance is much bigger than average, then relu
-# is not good - maybe try leaky relu?)
+#       is not good - maybe try leaky relu?)
 class RecurrentFFNet(nn.Module):
     """
     Implements a Recurrent Forward-Forward Network (RecurrentFFNet) based on
@@ -51,10 +51,10 @@ class RecurrentFFNet(nn.Module):
     passes operating on different data and with contrasting objectives.
 
     During training, a "positive" pass operates on real input data and adjusts
-    the weights to increase the 'goodness' in each hidden layer. The 'goodness'
+    the weights to decrease the 'badness' in each hidden layer. The 'badness'
     is calculated as the sum of squared activation values. On the other hand, a
     "negative" pass operates on "negative data" and adjusts the weights to
-    decrease the 'goodness' in each hidden layer.
+    increase the 'badness' in each hidden layer.
 
     The hidden layers and output layer are instances of the HiddenLayer and
     OutputLayer classes, respectively. The hidden layers are connected to each
@@ -120,17 +120,17 @@ class RecurrentFFNet(nn.Module):
             data through the network. It then runs a specified number of iterations, where it trains the network
             using the input and label data.
 
-            After each batch, the method calculates the 'goodness' metric for each layer in the network (for both
+            After each batch, the method calculates the 'badness' metric for each layer in the network (for both
             positive and negative data), averages the layer losses, and then calculates the prediction accuracy on
             the test data using test_loader.
 
-            Finally, the method logs these metrics (accuracy, average loss, and layer-wise 'goodness' scores)
+            Finally, the method logs these metrics (accuracy, average loss, and layer-wise 'badness' scores)
             for monitoring the training process. The metrics logged depend on the number of layers in the network.
 
         Note:
-            'Goodness' here refers to a metric that indicates how well the model's current activations represent
-            a given class. It's calculated by a function `layer_activations_to_goodness`, which transforms a
-            layer's activations into a 'goodness' score. This function operates on the RecurrentFFNet model level
+            'Badness' here refers to a metric that indicates how well the model's current activations represent
+            a given class. It's calculated by a function `layer_activations_to_badness`, which transforms a
+            layer's activations into a 'badness' score. This function operates on the RecurrentFFNet model level
             and is called during the training process.
         """
         for epoch in range(0, self.settings.model.epochs):
@@ -144,7 +144,7 @@ class RecurrentFFNet(nn.Module):
                     self.processor.replace_negative_data_inplace(
                         input_data.pos_input, label_data)
 
-                average_layer_loss, pos_goodness_per_layer, neg_goodness_per_layer = self.__train_batch(
+                average_layer_loss, pos_badness_per_layer, neg_badness_per_layer = self.__train_batch(
                     batch_num, input_data, label_data)
 
             # Get some observability into prediction while training.
@@ -154,8 +154,8 @@ class RecurrentFFNet(nn.Module):
             self.__log_metrics(
                 accuracy,
                 average_layer_loss,
-                pos_goodness_per_layer,
-                neg_goodness_per_layer,
+                pos_badness_per_layer,
+                neg_badness_per_layer,
                 epoch)
 
     def __train_batch(self, batch_num, input_data, label_data):
@@ -163,23 +163,23 @@ class RecurrentFFNet(nn.Module):
 
         self.inner_layers.reset_activations(True)
 
-        # TODO: zero label
         for preinit_step in range(0, len(self.inner_layers)):
             logging.debug("Preinitialization step: " +
                           str(preinit_step))
 
             pos_input = input_data.pos_input[0]
             neg_input = input_data.neg_input[0]
-            pos_labels = label_data.pos_labels[0]
-            neg_labels = label_data.neg_labels[0]
+
+            preinit_upper_clamped_tensor = self.processor.get_preinit_upper_clamped_tensor(
+                label_data.pos_labels[0].shape)
 
             self.inner_layers.advance_layers_forward(
-                ForwardMode.PositiveData, pos_input, pos_labels, False)
+                ForwardMode.PositiveData, pos_input, preinit_upper_clamped_tensor, False)
             self.inner_layers.advance_layers_forward(
-                ForwardMode.NegativeData, neg_input, neg_labels, False)
+                ForwardMode.NegativeData, neg_input, preinit_upper_clamped_tensor, False)
 
-        pos_goodness_per_layer = []
-        neg_goodness_per_layer = []
+        pos_badness_per_layer = []
+        neg_badness_per_layer = []
         pos_target_latents = LatentAverager()
         iterations = input_data.pos_input.shape[0]
         for iteration in range(0, iterations):
@@ -205,9 +205,9 @@ class RecurrentFFNet(nn.Module):
 
             if iteration >= lower_iteration_threshold and \
                     iteration <= upper_iteration_threshold:
-                pos_goodness_per_layer.append([layer_activations_to_goodness(
+                pos_badness_per_layer.append([layer_activations_to_badness(
                     layer.pos_activations.current).mean() for layer in self.inner_layers])
-                neg_goodness_per_layer.append([layer_activations_to_goodness(
+                neg_badness_per_layer.append([layer_activations_to_badness(
                     layer.neg_activations.current).mean() for layer in self.inner_layers])
 
                 positive_latents = [
@@ -220,59 +220,59 @@ class RecurrentFFNet(nn.Module):
             self.processor.train_class_predictor_from_latents(
                 pos_target_latents, label_data.pos_labels[0])
 
-        pos_goodness_per_layer = [
-            sum(layer_goodnesses) /
-            len(layer_goodnesses) for layer_goodnesses in zip(
+        pos_badness_per_layer = [
+            sum(layer_badnesses) /
+            len(layer_badnesses) for layer_badnesses in zip(
                 *
-                pos_goodness_per_layer)]
-        neg_goodness_per_layer = [
-            sum(layer_goodnesses) /
-            len(layer_goodnesses) for layer_goodnesses in zip(
+                pos_badness_per_layer)]
+        neg_badness_per_layer = [
+            sum(layer_badnesses) /
+            len(layer_badnesses) for layer_badnesses in zip(
                 *
-                neg_goodness_per_layer)]
+                neg_badness_per_layer)]
 
-        return average_layer_loss, pos_goodness_per_layer, neg_goodness_per_layer
+        return average_layer_loss, pos_badness_per_layer, neg_badness_per_layer
 
     def __log_metrics(
             self,
             accuracy,
             average_layer_loss,
-            pos_goodness_per_layer,
-            neg_goodness_per_layer,
+            pos_badness_per_layer,
+            neg_badness_per_layer,
             epoch):
-        # Supports wandb tracking of max 3 layer goodnesses
+        # Supports wandb tracking of max 3 layer badnesses
         try:
-            first_layer_pos_goodness = pos_goodness_per_layer[0]
-            first_layer_neg_goodness = neg_goodness_per_layer[0]
-            second_layer_pos_goodness = pos_goodness_per_layer[1]
-            second_layer_neg_goodness = neg_goodness_per_layer[1]
-            third_layer_pos_goodness = pos_goodness_per_layer[2]
-            third_layer_neg_goodness = neg_goodness_per_layer[2]
+            first_layer_pos_badness = pos_badness_per_layer[0]
+            first_layer_neg_badness = neg_badness_per_layer[0]
+            second_layer_pos_badness = pos_badness_per_layer[1]
+            second_layer_neg_badness = neg_badness_per_layer[1]
+            third_layer_pos_badness = pos_badness_per_layer[2]
+            third_layer_neg_badness = neg_badness_per_layer[2]
         except BaseException:
             # No-op as there may not be 3 layers
             pass
 
-        if len(self.inner_layers) == 3:
+        if len(self.inner_layers) >= 3:
             wandb.log({"acc": accuracy,
                        "loss": average_layer_loss,
-                       "first_layer_pos_goodness": first_layer_pos_goodness,
-                       "second_layer_pos_goodness": second_layer_pos_goodness,
-                       "third_layer_pos_goodness": third_layer_pos_goodness,
-                       "first_layer_neg_goodness": first_layer_neg_goodness,
-                       "second_layer_neg_goodness": second_layer_neg_goodness,
-                       "third_layer_neg_goodness": third_layer_neg_goodness,
+                       "first_layer_pos_badness": first_layer_pos_badness,
+                       "second_layer_pos_badness": second_layer_pos_badness,
+                       "third_layer_pos_badness": third_layer_pos_badness,
+                       "first_layer_neg_badness": first_layer_neg_badness,
+                       "second_layer_neg_badness": second_layer_neg_badness,
+                       "third_layer_neg_badness": third_layer_neg_badness,
                        "epoch": epoch})
         elif len(self.inner_layers) == 2:
             wandb.log({"acc": accuracy,
                        "loss": average_layer_loss,
-                       "first_layer_pos_goodness": first_layer_pos_goodness,
-                       "second_layer_pos_goodness": second_layer_pos_goodness,
-                       "first_layer_neg_goodness": first_layer_neg_goodness,
-                       "second_layer_neg_goodness": second_layer_neg_goodness,
+                       "first_layer_pos_badness": first_layer_pos_badness,
+                       "second_layer_pos_badness": second_layer_pos_badness,
+                       "first_layer_neg_badness": first_layer_neg_badness,
+                       "second_layer_neg_badness": second_layer_neg_badness,
                        "epoch": epoch})
         elif len(self.inner_layers) == 1:
             wandb.log({"acc": accuracy,
                        "loss": average_layer_loss,
-                       "first_layer_pos_goodness": first_layer_pos_goodness,
-                       "first_layer_neg_goodness": first_layer_neg_goodness,
+                       "first_layer_pos_badness": first_layer_pos_badness,
+                       "first_layer_neg_badness": first_layer_neg_badness,
                        "epoch": epoch})

@@ -1,14 +1,14 @@
 import logging
 
 import torch
-from torch import nn
+from torch import Tensor, nn
 from torch.nn import functional as F
 from torch.optim import RMSprop
 import wandb
 
 from RecurrentFF.model.data_scenario.processor import DataScenarioProcessor
 from RecurrentFF.model.inner_layers import InnerLayers
-from RecurrentFF.util import LatentAverager, TrainLabelData, layer_activations_to_goodness, ForwardMode
+from RecurrentFF.util import LatentAverager, TrainLabelData, layer_activations_to_badness, ForwardMode
 from RecurrentFF.settings import Settings, DataConfig
 
 
@@ -199,7 +199,7 @@ class StaticSingleClassProcessor(DataScenarioProcessor):
         """
         This function predicts the class labels for the provided test data using
         the trained RecurrentFFNet model. It does so by enumerating all possible
-        class labels and choosing the one that produces the highest 'goodness'
+        class labels and choosing the one that produces the lowest 'badness'
         score. We cannot use this function for datasets with changing classes.
 
         Args:
@@ -211,19 +211,19 @@ class StaticSingleClassProcessor(DataScenarioProcessor):
 
         Procedure:
             The function first moves the test data and labels to the appropriate
-            device. It then calculates the 'goodness' metric for each possible
+            device. It then calculates the 'badness' metric for each possible
             class label, using a two-step process:
 
                 1. Resetting the network's activations and forwarding the data
                    through the network with the current label.
                 2. For each iteration within a specified threshold, forwarding
                    the data again, but this time retaining the
-                activations, which are used to calculate the 'goodness' for each
+                activations, which are used to calculate the 'badness' for each
                 layer.
 
-            The 'goodness' values across iterations and layers are then averaged
-            to produce a single 'goodness' score for each class label. The class
-            with the highest 'goodness' score is chosen as the prediction for
+            The 'badness' values across iterations and layers are then averaged
+            to produce a single 'badness' score for each class label. The class
+            with the lowest 'badness' score is chosen as the prediction for
             each test sample.
 
             Finally, the function calculates the overall accuracy of the model's
@@ -244,11 +244,18 @@ class StaticSingleClassProcessor(DataScenarioProcessor):
 
                 iterations = data.shape[0]
 
-                all_labels_goodness = []
+                all_labels_badness = []
 
-                # evaluate goodness for each possible label
+                # evaluate badness for each possible label
                 for label in range(self.settings.data_config.num_classes):
                     self.inner_layers.reset_activations(False)
+
+                    upper_clamped_tensor = self.get_preinit_upper_clamped_tensor(
+                        (data.shape[1], self.settings.data_config.num_classes))
+
+                    for _preinit_iteration in range(0, len(self.inner_layers)):
+                        self.inner_layers.advance_layers_forward(
+                            ForwardMode.PredictData, data[0], upper_clamped_tensor, False)
 
                     one_hot_labels = torch.zeros(
                         data.shape[1],
@@ -256,44 +263,40 @@ class StaticSingleClassProcessor(DataScenarioProcessor):
                         device=self.settings.device.device)
                     one_hot_labels[:, label] = 1.0
 
-                    for _preinit_iteration in range(0, len(self.inner_layers)):
-                        self.inner_layers.advance_layers_forward(
-                            ForwardMode.PredictData, data[0], one_hot_labels, False)
-
                     lower_iteration_threshold = iterations // 2 - \
                         iterations // 10
                     upper_iteration_threshold = iterations // 2 + \
                         iterations // 10
-                    goodnesses = []
+                    badnesses = []
                     for iteration in range(0, iterations):
                         self.inner_layers.advance_layers_forward(
                             ForwardMode.PredictData, data[iteration], one_hot_labels, True)
 
                         if iteration >= lower_iteration_threshold and iteration <= upper_iteration_threshold:
-                            layer_goodnesses = []
+                            layer_badnesses = []
                             for layer in self.inner_layers:
-                                layer_goodnesses.append(
-                                    layer_activations_to_goodness(
+                                layer_badnesses.append(
+                                    layer_activations_to_badness(
                                         layer.predict_activations.current))
 
-                            goodnesses.append(torch.stack(
-                                layer_goodnesses, dim=1))
+                            badnesses.append(torch.stack(
+                                layer_badnesses, dim=1))
 
                     # tensor of shape (batch_size, iterations, num_layers)
-                    goodnesses = torch.stack(goodnesses, dim=1)
+                    badnesses = torch.stack(badnesses, dim=1)
                     # average over iterations
-                    goodnesses = goodnesses.mean(dim=1)
+                    badnesses = badnesses.mean(dim=1)
                     # average over layers
-                    goodness = goodnesses.mean(dim=1)
+                    badness = badnesses.mean(dim=1)
 
-                    logging.debug("Goodness for prediction" + " " +
-                                  str(label) + ": " + str(goodness))
-                    all_labels_goodness.append(goodness)
+                    logging.debug("Badness for prediction" + " " +
+                                  str(label) + ": " + str(badness))
+                    all_labels_badness.append(badness)
 
-                all_labels_goodness = torch.stack(all_labels_goodness, dim=1)
+                all_labels_badness = torch.stack(all_labels_badness, dim=1)
 
-                # select the label with the maximum goodness
-                predicted_labels = torch.argmax(all_labels_goodness, dim=1)
+                # select the label with the maximum badness
+                predicted_labels = torch.argmin(all_labels_badness, dim=1)
                 logging.debug("Predicted labels: " + str(predicted_labels))
                 logging.debug("Actual labels: " + str(labels))
 
@@ -310,6 +313,11 @@ class StaticSingleClassProcessor(DataScenarioProcessor):
 
         return accuracy
 
+    def get_preinit_upper_clamped_tensor(self, upper_clamped_tensor_shape: tuple):
+        labels = torch.full(upper_clamped_tensor_shape, 1.0 / self.settings.data_config.num_classes,
+                            device=self.settings.device.device)
+        return labels
+
     def __retrieve_latents__(
             self,
             input_batch: torch.Tensor,
@@ -318,12 +326,11 @@ class StaticSingleClassProcessor(DataScenarioProcessor):
 
         # assign equal probability to all labels
         batch_size = input_labels.pos_labels[0].shape[0]
-        num_classes = input_labels.pos_labels[0].shape[1]
         equally_distributed_class_labels = torch.full(
             (batch_size,
-             num_classes),
+             self.settings.data_config.num_classes),
             1 /
-            num_classes).to(
+            self.settings.data_config.num_classes).to(
             device=self.settings.device.device)
 
         iterations = input_batch.shape[0]
