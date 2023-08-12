@@ -1,6 +1,5 @@
 import logging
 
-
 import torch
 from torch import nn
 from torch.nn import functional as F
@@ -15,6 +14,12 @@ from RecurrentFF.util import (
 from RecurrentFF.settings import (
     Settings,
 )
+
+
+class ReceptiveField(nn.Module):
+
+    def __init__(rows: int, cols: int, channels: int, receptive_field_dims: tuple):
+        pass
 
 
 class HiddenLayer(nn.Module):
