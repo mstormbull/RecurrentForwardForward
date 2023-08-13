@@ -2,7 +2,7 @@
 set -e
 
 export WANDB_MODE=dryrun
-python -m RecurrentFF.benchmarks.mnist.mnist --config-file ./test/config-files/ci.toml > log.txt
+python -m RecurrentFF.benchmarks.mnist.mnist --config-file ./test/config-files/ci.toml > log.txt 2>&1
 
 # Extract the accuracy from the log
 accuracy=$(grep "Test accuracy" log.txt | awk -F': ' '{print $NF}')
