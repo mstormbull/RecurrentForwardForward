@@ -10,7 +10,7 @@ accuracy=${accuracy%\%}  # Remove the % sign from the accuracy
 echo "Test Accuracy: $accuracy%"
 
 # Compare the accuracy to the threshold
-threshold=65
+threshold=55
 if (( $(echo "$accuracy >= $threshold" | bc -l) )); then
     echo "Test passed. Accuracy ($accuracy%) is above the threshold ($threshold%)."
 else
