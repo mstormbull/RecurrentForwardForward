@@ -7,6 +7,10 @@ from RecurrentFF.benchmarks.arguments import get_arguments
 CONFIG_FILE = "./config.toml"
 
 
+class Convolutions(BaseModel):
+    output_channels: int
+
+
 class DataConfig(BaseModel):
     data_size: int
     num_classes: int
@@ -63,6 +67,8 @@ class Model(BaseModel):
     classifier_adam: ClassifierAdam = None
     classifier_adadelta: FfAdadelta = None
 
+    convolutions: Convolutions = None
+
 
 class Device(BaseModel):
     device: str  # You may wish to modify this to suit your needs
@@ -94,6 +100,9 @@ class Settings(BaseModel):
         elif model['classifier_optimizer'] == "adadelta":
             model['classifier_adadelta'] = FfAdadelta(
                 **model['classifier_adadelta'])
+
+        if model['convolutions_enabled'] == True:
+            model['convolutions'] = Convolutions(**model['convolutions'])
 
         if "data_config" in config:
             data_config = DataConfig(**config["data_config"])
