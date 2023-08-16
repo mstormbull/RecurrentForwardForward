@@ -15,6 +15,11 @@ interconnect_density = 1
 should_log_metrics = true 
 should_replace_neg_data = false
 should_load_weights = false
+convolutions_enabled = true
+
+[model.convolutions]
+output_channels = 16
+
 
 [model.ff_rmsprop]
 momentum = 0.0

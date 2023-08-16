@@ -11,12 +11,35 @@ from RecurrentFF.model.hidden_layer import HiddenLayer
 
 class InnerLayers(nn.Module):
 
-    def __init__(self, settings, layers):
+    def __init__(self, settings, ff_layers, conv_layers):
         super(InnerLayers, self).__init__()
 
         self.settings = settings
 
-        self.layers = layers
+        self.ff_layers = ff_layers
+        self.conv_layers = conv_layers
+
+    def _process_convolutional_layers(self, input_data):
+        pos_input, neg_input = input_data
+
+        batch_size, flat_dim = pos_input.shape
+        square_image_width = int(flat_dim**0.5)
+
+        pos_reshaped_tensor = pos_input.view(
+            batch_size, square_image_width, square_image_width)
+        pos_reshaped_tensor = pos_reshaped_tensor.unsqueeze(1)
+        pos_post_conv_input = self.conv_layers.forward(pos_reshaped_tensor)
+        pos_post_conv_input = pos_post_conv_input.contiguous(
+        ).view(-1, pos_post_conv_input.size(1) * pos_post_conv_input.size(2) * pos_post_conv_input.size(3))
+
+        neg_reshaped_tensor = neg_input.view(
+            batch_size, square_image_width, square_image_width)
+        neg_reshaped_tensor = neg_reshaped_tensor.unsqueeze(1)
+        neg_post_conv_input = self.conv_layers.forward(neg_reshaped_tensor)
+        neg_post_conv_input = pos_post_conv_input.contiguous(
+        ).view(-1, pos_post_conv_input.size(1) * pos_post_conv_input.size(2) * pos_post_conv_input.size(3))
+
+        return (pos_post_conv_input, neg_post_conv_input)
 
     def advance_layers_train(self, input_data, label_data, should_damp, layer_metrics):
         """
@@ -47,14 +70,16 @@ class InnerLayers(nn.Module):
             training each layer, their stored activations are advanced by
             calling the 'advance_stored_activations' method.
         """
-        for i, layer in enumerate(self.layers):
+
+        input_data = self._process_convolutional_layers(input_data)
+        for i, layer in enumerate(self.ff_layers):
             logging.debug("Training layer " + str(i))
             loss = None
-            if i == 0 and len(self.layers) == 1:
+            if i == 0 and len(self.ff_layers) == 1:
                 loss = layer.train(input_data, label_data, should_damp)
             elif i == 0:
                 loss = layer.train(input_data, None, should_damp)
-            elif i == len(self.layers) - 1:
+            elif i == len(self.ff_layers) - 1:
                 loss = layer.train(None, label_data, should_damp)
             else:
                 loss = layer.train(None, None, should_damp)
@@ -70,7 +95,7 @@ class InnerLayers(nn.Module):
         logging.debug("Trained activations for layer " +
                       str(i))
 
-        for layer in self.layers:
+        for layer in self.ff_layers:
             layer.advance_stored_activations()
 
     def advance_layers_forward(
@@ -112,25 +137,27 @@ class InnerLayers(nn.Module):
             of the layers by performing a forward pass and advancing their
             stored activations.
         """
-        for i, layer in enumerate(self.layers):
-            if i == 0 and len(self.layers) == 1:
+        input_data = self._process_convolutional_layers(input_data)
+
+        for i, layer in enumerate(self.ff_layers):
+            if i == 0 and len(self.ff_layers) == 1:
                 layer.forward(mode, input_data, label_data, should_damp)
             elif i == 0:
                 layer.forward(mode, input_data, None, should_damp)
-            elif i == len(self.layers) - 1:
+            elif i == len(self.ff_layers) - 1:
                 layer.forward(mode, None, label_data, should_damp)
             else:
                 layer.forward(mode, None, None, should_damp)
 
-        for layer in self.layers:
+        for layer in self.ff_layers:
             layer.advance_stored_activations()
 
     def reset_activations(self, isTraining):
-        for layer in self.layers:
+        for layer in self.ff_layers:
             layer.reset_activations(isTraining)
 
     def __len__(self):
-        return len(self.layers)
+        return len(self.ff_layers)
 
     def __iter__(self):
         return (layer for layer in self.layers)

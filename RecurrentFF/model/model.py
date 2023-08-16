@@ -17,18 +17,20 @@ from RecurrentFF.util import (
     ForwardMode,
     LatentAverager,
     ValidationLoader,
+    calculate_conv_output_dimensions,
     layer_activations_to_badness,
 )
 from RecurrentFF.settings import (
     Settings,
 )
 
-
 # TODO: try sigmoid activation function
 # TODO: try use separate optimizer for lateral connections
 # TODO: try different learning rates for lateral connections
 # TODO: figure out average activation
 # TODO: log activations (variance is much bigger than average, then not good)
+
+
 class RecurrentFFNet(nn.Module):
     """
     Implements a Recurrent Forward-Forward Network (RecurrentFFNet) based on
@@ -63,8 +65,29 @@ class RecurrentFFNet(nn.Module):
 
         self.settings = settings
 
-        inner_layers = nn.ModuleList()
-        prev_size = self.settings.data_config.data_size
+        convolution_in_channels = 1
+        convolution_kernel_size = 3
+        convolution_padding = 1
+        convolution_stride = 1
+        max_pool_kernel_size = 2
+        max_pool_stride = 2
+        conv_output_size = calculate_conv_output_dimensions(
+            self.settings.data_config.data_size, self.settings.model.convolutions.output_channels, convolution_kernel_size, convolution_stride, convolution_padding, max_pool_kernel_size, max_pool_stride)
+
+        conv_layers = nn.Sequential(
+            nn.Conv2d(in_channels=convolution_in_channels, out_channels=self.settings.model.convolutions.output_channels,
+                      kernel_size=convolution_kernel_size, stride=convolution_stride, padding=convolution_padding),
+            nn.ReLU(),
+            nn.MaxPool2d(kernel_size=max_pool_kernel_size,
+                         stride=max_pool_stride)
+        )
+        for param in conv_layers.parameters():
+            param.requires_grad = False
+
+        fully_connected_layers = nn.ModuleList()
+        prev_size = conv_output_size
+        # prev_size = self.settings.data_config.data_size
+
         for i, size in enumerate(self.settings.model.hidden_sizes):
             next_size = self.settings.model.hidden_sizes[i + 1] if i < len(
                 self.settings.model.hidden_sizes) - 1 else self.settings.data_config.num_classes
@@ -77,19 +100,20 @@ class RecurrentFFNet(nn.Module):
                 size,
                 next_size,
                 self.settings.model.damping_factor)
-            inner_layers.append(hidden_layer)
+            fully_connected_layers.append(hidden_layer)
             prev_size = size
 
         # attach layers to each other
-        for i in range(1, len(inner_layers)):
-            hidden_layer = inner_layers[i]
-            hidden_layer.set_previous_layer(inner_layers[i - 1])
+        for i in range(1, len(fully_connected_layers)):
+            hidden_layer = fully_connected_layers[i]
+            hidden_layer.set_previous_layer(fully_connected_layers[i - 1])
 
-        for i in range(0, len(inner_layers) - 1):
-            hidden_layer = inner_layers[i]
-            hidden_layer.set_next_layer(inner_layers[i + 1])
+        for i in range(0, len(fully_connected_layers) - 1):
+            hidden_layer = fully_connected_layers[i]
+            hidden_layer.set_next_layer(fully_connected_layers[i + 1])
 
-        self.inner_layers = InnerLayers(self.settings, inner_layers)
+        self.inner_layers = InnerLayers(
+            self.settings, fully_connected_layers, conv_layers)
 
         # when we eventually support changing/multiclass scenarios this will be
         # configurable
