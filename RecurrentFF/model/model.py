@@ -23,7 +23,6 @@ from RecurrentFF.settings import (
 )
 
 # TODO: store activations
-# TODO: add conv layer at beginning to use receptive fields
 # TODO: try sigmoid activation function
 # TODO: use separate optimizer for lateral connections
 # TODO: plumb optimizer into `HiddenLayer`
@@ -70,6 +69,7 @@ class RecurrentFFNet(nn.Module):
 
         self.settings = settings
 
+        # TODO: either make these config or constants
         convolution_in_channels = 1
         convolution_kernel_size = 3
         convolution_padding = 1

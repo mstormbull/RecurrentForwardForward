@@ -1,40 +1,17 @@
 import logging
 
-
 from torch import nn
 
 
 class InnerLayers(nn.Module):
 
-    def __init__(self, settings, ff_layers, conv_layers):
+    def __init__(self, settings, ff_layers, conv_layers=None):
         super(InnerLayers, self).__init__()
 
         self.settings = settings
 
         self.ff_layers = ff_layers
         self.conv_layers = conv_layers
-
-    def _process_convolutional_layers(self, input_data):
-        pos_input, neg_input = input_data
-
-        batch_size, flat_dim = pos_input.shape
-        square_image_width = int(flat_dim**0.5)
-
-        pos_reshaped_tensor = pos_input.view(
-            batch_size, square_image_width, square_image_width)
-        pos_reshaped_tensor = pos_reshaped_tensor.unsqueeze(1)
-        pos_post_conv_input = self.conv_layers.forward(pos_reshaped_tensor)
-        pos_post_conv_input = pos_post_conv_input.contiguous(
-        ).view(-1, pos_post_conv_input.size(1) * pos_post_conv_input.size(2) * pos_post_conv_input.size(3))
-
-        neg_reshaped_tensor = neg_input.view(
-            batch_size, square_image_width, square_image_width)
-        neg_reshaped_tensor = neg_reshaped_tensor.unsqueeze(1)
-        neg_post_conv_input = self.conv_layers.forward(neg_reshaped_tensor)
-        neg_post_conv_input = pos_post_conv_input.contiguous(
-        ).view(-1, pos_post_conv_input.size(1) * pos_post_conv_input.size(2) * pos_post_conv_input.size(3))
-
-        return (pos_post_conv_input, neg_post_conv_input)
 
     def advance_layers_train(self, input_data, label_data, should_damp):
         """
@@ -66,7 +43,9 @@ class InnerLayers(nn.Module):
             calling the 'advance_stored_activations' method.
         """
 
-        input_data = self._process_convolutional_layers(input_data)
+        if self.conv_layers is not None:
+            input_data = self._process_convolutional_layers_multi_input(
+                input_data)
 
         total_loss = 0
         for i, layer in enumerate(self.ff_layers):
@@ -130,7 +109,9 @@ class InnerLayers(nn.Module):
             of the layers by performing a forward pass and advancing their
             stored activations.
         """
-        input_data = self._process_convolutional_layers(input_data)
+        if self.conv_layers is not None:
+            input_data = self._process_convolutional_layers_single_input(
+                input_data)
 
         for i, layer in enumerate(self.ff_layers):
             if i == 0 and len(self.ff_layers) == 1:
@@ -148,6 +129,29 @@ class InnerLayers(nn.Module):
     def reset_activations(self, isTraining):
         for layer in self.ff_layers:
             layer.reset_activations(isTraining)
+
+    def _process_convolutional_layers_single_input(self, input_data):
+        batch_size, flat_dim = input_data.shape
+        square_image_width = int(flat_dim**0.5)
+
+        reshaped_tensor = input_data.view(
+            batch_size, square_image_width, square_image_width)
+        reshaped_tensor = reshaped_tensor.unsqueeze(1)
+        post_conv_input = self.conv_layers.forward(reshaped_tensor)
+        post_conv_input = post_conv_input.contiguous(
+        ).view(-1, post_conv_input.size(1) * post_conv_input.size(2) * post_conv_input.size(3))
+
+        return post_conv_input
+
+    def _process_convolutional_layers_multi_input(self, input_data):
+        pos_input, neg_input = input_data
+
+        pos_post_conv_input = self._process_convolutional_layers_single_input(
+            pos_input)
+        neg_post_conv_input = self._process_convolutional_layers_single_input(
+            neg_input)
+
+        return pos_post_conv_input, neg_post_conv_input
 
     def __len__(self):
         return len(self.ff_layers)
