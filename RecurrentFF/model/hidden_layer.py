@@ -86,13 +86,8 @@ class HiddenLayer(nn.Module):
         self.backward_linear.weight.register_hook(
             lambda grad: grad * self.backward_mask)
 
-        # Initialize the weights to be non-identity, and restrict the identity
-        # weights
         self.lateral_linear = nn.Linear(size, size)
-        nn.init.kaiming_uniform_(self.lateral_linear.weight)
-        with torch.no_grad():
-            self.lateral_linear.weight.fill_diagonal_(0)
-        self.lateral_linear.register_backward_hook(zero_diagonal_hook)
+        nn.init.eye_(self.lateral_linear.weight)
 
         self.recurrent_linear = nn.Parameter(torch.ones(size))
 
@@ -344,8 +339,7 @@ class HiddenLayer(nn.Module):
                     self.next_layer.backward_linear.weight)) + \
                 F.leaky_relu(F.linear(
                     prev_act_stdized,
-                    self.lateral_linear.weight)) + \
-                F.leaky_relu(recurrent_output)
+                    self.lateral_linear.weight))
 
             if should_damp:
                 old_activation = new_activation
@@ -379,8 +373,7 @@ class HiddenLayer(nn.Module):
                     self.next_layer.backward_linear.weight)) + \
                 F.leaky_relu(F.linear(
                     prev_act_stdized,
-                    self.lateral_linear.weight)) + \
-                F.leaky_relu(recurrent_output)
+                    self.lateral_linear.weight))
 
             if should_damp:
                 old_activation = new_activation
@@ -421,8 +414,7 @@ class HiddenLayer(nn.Module):
                     self.next_layer.backward_linear.weight)) + \
                 F.leaky_relu(F.linear(
                     prev_act_stdized,
-                    self.lateral_linear.weight)) + \
-                F.leaky_relu(recurrent_output)
+                    self.lateral_linear.weight))
 
             if should_damp:
                 old_activation = new_activation
@@ -463,8 +455,7 @@ class HiddenLayer(nn.Module):
                     self.next_layer.backward_linear.weight)) + \
                 F.leaky_relu(F.linear(
                     prev_act_stdized,
-                    self.lateral_linear.weight)) + \
-                F.leaky_relu(recurrent_output)
+                    self.lateral_linear.weight))
 
             if should_damp:
                 old_activation = new_activation
