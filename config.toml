@@ -13,7 +13,7 @@ should_replace_neg_data = true
 ff_activation = "relu"
 ff_optimizer = "adam"
 classifier_optimizer = "rmsprop"
-interconnect_density = 1
+interconnect_density = 0.75
 
 [model.ff_rmsprop]
 momentum = 0.2
