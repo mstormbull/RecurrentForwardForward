@@ -17,11 +17,6 @@ from RecurrentFF.settings import (
 )
 
 
-def zero_diagonal_hook(module, grad_input, grad_output):
-    with torch.no_grad():
-        module.weight.grad.fill_diagonal_(0)
-
-
 class HiddenLayer(nn.Module):
     """
     A HiddenLayer class for a novel Forward-Forward Recurrent Network, with
@@ -86,18 +81,14 @@ class HiddenLayer(nn.Module):
         self.backward_linear.weight.register_hook(
             lambda grad: grad * self.backward_mask)
 
-        # Initialize the weights to be non-identity, and restrict the identity
-        # weights
+        # Initialize the lateral weights to be the identity matrix
         self.lateral_linear = nn.Linear(size, size)
-        nn.init.kaiming_uniform_(self.lateral_linear.weight)
-        with torch.no_grad():
-            self.lateral_linear.weight.fill_diagonal_(0)
-        self.lateral_linear.register_backward_hook(zero_diagonal_hook)
-
-        self.recurrent_linear = nn.Parameter(torch.ones(size))
+        nn.init.eye_(self.lateral_linear.weight)
 
         self.previous_layer = None
         self.next_layer = None
+
+        self.prelu = torch.nn.PReLU()
 
         if self.settings.model.ff_optimizer == "adam":
             self.optimizer = Adam(self.parameters(),
@@ -332,20 +323,16 @@ class HiddenLayer(nn.Module):
             prev_act_stdized = standardize_layer_activations(
                 prev_act, self.settings.model.epsilon)
 
-            recurrent_output = prev_act_stdized * \
-                self.recurrent_linear.unsqueeze(0)
-
             new_activation =  \
-                F.relu(F.linear(
+                F.elu(F.linear(
                     prev_layer_stdized,
                     self.forward_linear.weight)) + \
-                -1 * F.relu(F.linear(
+                -1 * F.elu(F.linear(
                     next_layer_stdized,
                     self.next_layer.backward_linear.weight)) + \
-                F.leaky_relu(F.linear(
+                self.prelu(F.linear(
                     prev_act_stdized,
-                    self.lateral_linear.weight)) + \
-                F.leaky_relu(recurrent_output)
+                    self.lateral_linear.weight))
 
             if should_damp:
                 old_activation = new_activation
@@ -367,20 +354,16 @@ class HiddenLayer(nn.Module):
             prev_act_stdized = standardize_layer_activations(
                 prev_act, self.settings.model.epsilon)
 
-            recurrent_output = prev_act_stdized * \
-                self.recurrent_linear.unsqueeze(0)
-
             new_activation = \
-                F.relu(F.linear(
+                F.elu(F.linear(
                     data,
                     self.forward_linear.weight)) + \
-                -1 * F.relu(F.linear(
+                -1 * F.elu(F.linear(
                     labels,
                     self.next_layer.backward_linear.weight)) + \
-                F.leaky_relu(F.linear(
+                self.prelu(F.linear(
                     prev_act_stdized,
-                    self.lateral_linear.weight)) + \
-                F.leaky_relu(recurrent_output)
+                    self.lateral_linear.weight))
 
             if should_damp:
                 old_activation = new_activation
@@ -409,20 +392,16 @@ class HiddenLayer(nn.Module):
             prev_act_stdized = standardize_layer_activations(
                 prev_act, self.settings.model.epsilon)
 
-            recurrent_output = prev_act_stdized * \
-                self.recurrent_linear.unsqueeze(0)
-
             new_activation = \
-                F.relu(F.linear(
+                F.elu(F.linear(
                     data,
                     self.forward_linear.weight)) + \
-                -1 * F.relu(F.linear(
+                -1 * F.elu(F.linear(
                     next_layer_stdized,
                     self.next_layer.backward_linear.weight)) + \
-                F.leaky_relu(F.linear(
+                self.prelu(F.linear(
                     prev_act_stdized,
-                    self.lateral_linear.weight)) + \
-                F.leaky_relu(recurrent_output)
+                    self.lateral_linear.weight))
 
             if should_damp:
                 old_activation = new_activation
@@ -451,20 +430,16 @@ class HiddenLayer(nn.Module):
             prev_act_stdized = standardize_layer_activations(
                 prev_act, self.settings.model.epsilon)
 
-            recurrent_output = prev_act_stdized * \
-                self.recurrent_linear.unsqueeze(0)
-
             new_activation = \
-                F.relu(F.linear(
+                F.elu(F.linear(
                     prev_layer_stdized,
                     self.forward_linear.weight)) + \
-                -1 * F.relu(F.linear(
+                -1 * F.elu(F.linear(
                     labels,
                     self.next_layer.backward_linear.weight)) + \
-                F.leaky_relu(F.linear(
+                self.prelu(F.linear(
                     prev_act_stdized,
-                    self.lateral_linear.weight)) + \
-                F.leaky_relu(recurrent_output)
+                    self.lateral_linear.weight))
 
             if should_damp:
                 old_activation = new_activation
