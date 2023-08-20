@@ -99,8 +99,6 @@ class HiddenLayer(nn.Module):
         self.previous_layer = None
         self.next_layer = None
 
-        self.prelu = torch.nn.PReLU()
-
         if self.settings.model.ff_optimizer == "adam":
             self.optimizer = Adam(self.parameters(),
                                   lr=self.settings.model.ff_adam.learning_rate)
@@ -338,16 +336,16 @@ class HiddenLayer(nn.Module):
                 self.recurrent_linear.unsqueeze(0)
 
             new_activation =  \
-                F.elu(F.linear(
+                F.relu(F.linear(
                     prev_layer_stdized,
                     self.forward_linear.weight)) + \
-                -1 * F.elu(F.linear(
+                -1 * F.relu(F.linear(
                     next_layer_stdized,
                     self.next_layer.backward_linear.weight)) + \
-                self.prelu(F.linear(
+                F.leaky_relu(F.linear(
                     prev_act_stdized,
                     self.lateral_linear.weight)) + \
-                self.prelu(recurrent_output)
+                F.leaky_relu(recurrent_output)
 
             if should_damp:
                 old_activation = new_activation
@@ -373,16 +371,16 @@ class HiddenLayer(nn.Module):
                 self.recurrent_linear.unsqueeze(0)
 
             new_activation = \
-                F.elu(F.linear(
+                F.relu(F.linear(
                     data,
                     self.forward_linear.weight)) + \
-                -1 * F.elu(F.linear(
+                -1 * F.relu(F.linear(
                     labels,
                     self.next_layer.backward_linear.weight)) + \
-                self.prelu(F.linear(
+                F.leaky_relu(F.linear(
                     prev_act_stdized,
                     self.lateral_linear.weight)) + \
-                self.prelu(recurrent_output)
+                F.leaky_relu(recurrent_output)
 
             if should_damp:
                 old_activation = new_activation
@@ -415,16 +413,16 @@ class HiddenLayer(nn.Module):
                 self.recurrent_linear.unsqueeze(0)
 
             new_activation = \
-                F.elu(F.linear(
+                F.relu(F.linear(
                     data,
                     self.forward_linear.weight)) + \
-                -1 * F.elu(F.linear(
+                -1 * F.relu(F.linear(
                     next_layer_stdized,
                     self.next_layer.backward_linear.weight)) + \
-                self.prelu(F.linear(
+                F.leaky_relu(F.linear(
                     prev_act_stdized,
                     self.lateral_linear.weight)) + \
-                self.prelu(recurrent_output)
+                F.leaky_relu(recurrent_output)
 
             if should_damp:
                 old_activation = new_activation
@@ -457,16 +455,16 @@ class HiddenLayer(nn.Module):
                 self.recurrent_linear.unsqueeze(0)
 
             new_activation = \
-                F.elu(F.linear(
+                F.relu(F.linear(
                     prev_layer_stdized,
                     self.forward_linear.weight)) + \
-                -1 * F.elu(F.linear(
+                -1 * F.relu(F.linear(
                     labels,
                     self.next_layer.backward_linear.weight)) + \
-                self.prelu(F.linear(
+                F.leaky_relu(F.linear(
                     prev_act_stdized,
                     self.lateral_linear.weight)) + \
-                self.prelu(recurrent_output)
+                F.leaky_relu(recurrent_output)
 
             if should_damp:
                 old_activation = new_activation
