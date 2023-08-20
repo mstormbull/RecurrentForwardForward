@@ -334,7 +334,7 @@ class HiddenLayer(nn.Module):
             prev_act_stdized = standardize_layer_activations(
                 prev_act, self.settings.model.epsilon)
 
-            recurrent_output = prev_act * \
+            recurrent_output = prev_act_stdized * \
                 self.recurrent_linear.unsqueeze(0)
 
             new_activation =  \
@@ -369,7 +369,7 @@ class HiddenLayer(nn.Module):
             prev_act_stdized = standardize_layer_activations(
                 prev_act, self.settings.model.epsilon)
 
-            recurrent_output = prev_act * \
+            recurrent_output = prev_act_stdized * \
                 self.recurrent_linear.unsqueeze(0)
 
             new_activation = \
@@ -411,7 +411,7 @@ class HiddenLayer(nn.Module):
             prev_act_stdized = standardize_layer_activations(
                 prev_act, self.settings.model.epsilon)
 
-            recurrent_output = prev_act * \
+            recurrent_output = prev_act_stdized * \
                 self.recurrent_linear.unsqueeze(0)
 
             new_activation = \
@@ -453,7 +453,7 @@ class HiddenLayer(nn.Module):
             prev_act_stdized = standardize_layer_activations(
                 prev_act, self.settings.model.epsilon)
 
-            recurrent_output = prev_act * \
+            recurrent_output = prev_act_stdized * \
                 self.recurrent_linear.unsqueeze(0)
 
             new_activation = \
