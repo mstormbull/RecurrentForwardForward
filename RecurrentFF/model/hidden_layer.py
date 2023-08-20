@@ -17,6 +17,11 @@ from RecurrentFF.settings import (
 )
 
 
+def zero_diagonal_hook(module, grad_input, grad_output):
+    with torch.no_grad():
+        module.weight.grad.fill_diagonal_(0)
+
+
 class HiddenLayer(nn.Module):
     """
     A HiddenLayer class for a novel Forward-Forward Recurrent Network, with
@@ -81,9 +86,15 @@ class HiddenLayer(nn.Module):
         self.backward_linear.weight.register_hook(
             lambda grad: grad * self.backward_mask)
 
-        # Initialize the lateral weights to be the identity matrix
+        # Initialize the weights to be non-identity, and restrict the identity
+        # weights
         self.lateral_linear = nn.Linear(size, size)
-        nn.init.eye_(self.lateral_linear.weight)
+        nn.init.kaiming_uniform_(self.lateral_linear.weight)
+        with torch.no_grad():
+            self.lateral_linear.weight.fill_diagonal_(0)
+        self.lateral_linear.register_backward_hook(zero_diagonal_hook)
+
+        self.recurrent_linear = nn.Parameter(torch.ones(size))
 
         self.previous_layer = None
         self.next_layer = None
@@ -323,6 +334,9 @@ class HiddenLayer(nn.Module):
             prev_act_stdized = standardize_layer_activations(
                 prev_act, self.settings.model.epsilon)
 
+            recurrent_output = prev_act * \
+                self.recurrent_linear.unsqueeze(0)
+
             new_activation =  \
                 F.elu(F.linear(
                     prev_layer_stdized,
@@ -332,7 +346,8 @@ class HiddenLayer(nn.Module):
                     self.next_layer.backward_linear.weight)) + \
                 self.prelu(F.linear(
                     prev_act_stdized,
-                    self.lateral_linear.weight))
+                    self.lateral_linear.weight)) + \
+                self.prelu(recurrent_output)
 
             if should_damp:
                 old_activation = new_activation
@@ -354,6 +369,9 @@ class HiddenLayer(nn.Module):
             prev_act_stdized = standardize_layer_activations(
                 prev_act, self.settings.model.epsilon)
 
+            recurrent_output = prev_act * \
+                self.recurrent_linear.unsqueeze(0)
+
             new_activation = \
                 F.elu(F.linear(
                     data,
@@ -363,7 +381,8 @@ class HiddenLayer(nn.Module):
                     self.next_layer.backward_linear.weight)) + \
                 self.prelu(F.linear(
                     prev_act_stdized,
-                    self.lateral_linear.weight))
+                    self.lateral_linear.weight)) + \
+                self.prelu(recurrent_output)
 
             if should_damp:
                 old_activation = new_activation
@@ -392,6 +411,9 @@ class HiddenLayer(nn.Module):
             prev_act_stdized = standardize_layer_activations(
                 prev_act, self.settings.model.epsilon)
 
+            recurrent_output = prev_act * \
+                self.recurrent_linear.unsqueeze(0)
+
             new_activation = \
                 F.elu(F.linear(
                     data,
@@ -401,7 +423,8 @@ class HiddenLayer(nn.Module):
                     self.next_layer.backward_linear.weight)) + \
                 self.prelu(F.linear(
                     prev_act_stdized,
-                    self.lateral_linear.weight))
+                    self.lateral_linear.weight)) + \
+                self.prelu(recurrent_output)
 
             if should_damp:
                 old_activation = new_activation
@@ -430,6 +453,9 @@ class HiddenLayer(nn.Module):
             prev_act_stdized = standardize_layer_activations(
                 prev_act, self.settings.model.epsilon)
 
+            recurrent_output = prev_act * \
+                self.recurrent_linear.unsqueeze(0)
+
             new_activation = \
                 F.elu(F.linear(
                     prev_layer_stdized,
@@ -439,7 +465,8 @@ class HiddenLayer(nn.Module):
                     self.next_layer.backward_linear.weight)) + \
                 self.prelu(F.linear(
                     prev_act_stdized,
-                    self.lateral_linear.weight))
+                    self.lateral_linear.weight)) + \
+                self.prelu(recurrent_output)
 
             if should_damp:
                 old_activation = new_activation
