@@ -17,6 +17,38 @@ from RecurrentFF.settings import (
 )
 
 
+# TODO: fix warning about aten::sgn
+def loss(pos_badness, neg_badness, epsilon, delta=1e-2, alpha=1.0):
+    """
+    Parameters:
+    - p (torch.Tensor): Tensor representing the value of p.
+    - n (torch.Tensor): Tensor representing the value of n.
+    - epsilon (float, optional): Small constant to avoid division by zero. Default is 1e-5.
+    - delta (float, optional): Small constant to ensure the exponential term never becomes zero. Default is 1e-2.
+    - alpha (float, optional): Scaling factor for p. Default is 1.0.
+
+    Returns:
+    - torch.Tensor: Computed loss value.
+
+    Notes:
+    1. The term (1 / (n^2 + epsilon)) ensures the loss is high when n is close to 0 and prevents division by zero.
+    2. The term (exp(-|n|) + delta) ensures the loss decreases as |n| increases and never becomes exactly zero.
+    3. The term (alpha * p^2) ensures the loss increases with higher absolute values of p.
+    """
+
+    # Term 1: High loss when n is close to 0
+    L1 = 1 / (neg_badness**2 + epsilon)
+
+    # Term 2: Loss decreases as |n| increases
+    L2 = torch.exp(-torch.abs(neg_badness)) + delta
+
+    # Term 3: Loss increases with higher absolute values of p
+    L3 = alpha * pos_badness**2
+
+    loss = L1 + L2 + L3
+    return loss.mean()
+
+
 class HiddenLayer(nn.Module):
     """
     A HiddenLayer class for a novel Forward-Forward Recurrent Network, with
@@ -230,11 +262,14 @@ class HiddenLayer(nn.Module):
 
         # Loss function equivelent to:
         # L = log(1 + exp(((-n + 2) + (p - 2))/2)
-        layer_loss = F.softplus(torch.cat([
-            (-1 * neg_badness) + self.settings.model.loss_threshold,
-            pos_badness - self.settings.model.loss_threshold
-        ])).mean()
-
+        # Wolfram:
+        # plot3d log(1 + e^(-n + 1)) + log(1 + e^(p - 1)) for p from -5 to 5 and n from -5 to 5
+        # layer_loss = F.softplus(torch.cat([
+        #     (-1 * neg_badness) + self.settings.model.loss_threshold,
+        #     pos_badness - self.settings.model.loss_threshold
+        # ])).mean()
+        layer_loss = loss(pos_badness, neg_badness,
+                          self.settings.model.epsilon)
         layer_loss.backward()
 
         self.optimizer.step()
