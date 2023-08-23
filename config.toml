@@ -2,7 +2,7 @@
 device = "mps"
 
 [model]
-hidden_sizes = [2500, 2500, 2500]
+hidden_sizes = [250, 250, 250]
 epochs = 275
 loss_threshold = 1.5
 damping_factor = 0.7
@@ -13,7 +13,7 @@ should_replace_neg_data = true
 ff_activation = "relu"
 ff_optimizer = "adam"
 classifier_optimizer = "rmsprop"
-interconnect_density = 0.75
+interconnect_density = 1
 
 [model.ff_rmsprop]
 momentum = 0.2

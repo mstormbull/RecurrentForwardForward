@@ -18,6 +18,8 @@ from RecurrentFF.settings import (
 
 
 # TODO: fix warning about aten::sgn
+# Plot3D[1/(n^2 + 0.00001) + (Exp[-Abs[n]] + 0.01) + (1.0*p^2), {p, -10, 10}, {n, -10, 10}]
+# L =1/(abs(n)^1.01+0.3) + abs(p/2)^3 for p=-3 to 3, n=-3 to 3
 def loss(pos_badness, neg_badness, epsilon, delta=1e-2, alpha=1.0):
     """
     Parameters:
@@ -36,16 +38,15 @@ def loss(pos_badness, neg_badness, epsilon, delta=1e-2, alpha=1.0):
     3. The term (alpha * p^2) ensures the loss increases with higher absolute values of p.
     """
 
-    # Term 1: High loss when n is close to 0
-    L1 = 1 / (neg_badness**2 + epsilon)
+    # Term 1: High loss for when n is 0, that slopes downward in convex shape as
+    # abs(n) increases
+    L1 = 1 / (torch.abs(neg_badness) ** 1.01 + 0.3)
 
-    # Term 2: Loss decreases as |n| increases
-    L2 = torch.exp(-torch.abs(neg_badness)) + delta
+    # Term 2: High loss for when abs(p) is high. Divide by 2 to avoid trough
+    # that can cause optimizer thrashing between sides of trough.
+    L2 = (torch.abs(pos_badness) / 2) ** 3
 
-    # Term 3: Loss increases with higher absolute values of p
-    L3 = alpha * pos_badness**2
-
-    loss = L1 + L2 + L3
+    loss = L1 + L2
     return loss.mean()
 
 
