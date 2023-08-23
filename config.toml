@@ -2,7 +2,7 @@
 device = "mps"
 
 [model]
-hidden_sizes = [250, 250, 250]
+hidden_sizes = [3000, 3000, 3000, 3000]
 epochs = 275
 loss_threshold = 1.5
 damping_factor = 0.7
@@ -11,13 +11,13 @@ skip_profiling = 1
 should_log_metrics = true 
 should_replace_neg_data = true
 ff_activation = "relu"
-ff_optimizer = "adam"
-classifier_optimizer = "rmsprop"
+ff_optimizer = "rmsprop"
+classifier_optimizer = "adam"
 interconnect_density = 1
 
 [model.ff_rmsprop]
-momentum = 0.2
-learning_rate = 0.00001
+momentum = 0.0
+learning_rate = 0.0001
 
 [model.classifier_rmsprop]
 momentum = 0
@@ -27,7 +27,7 @@ learning_rate = 0.00001
 learning_rate = 0.00001
 
 [model.classifier_adam]
-learning_rate = 0.001
+learning_rate = 0.01
 
 [model.ff_adadelta]
 learning_rate = 0.0001
