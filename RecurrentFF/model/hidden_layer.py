@@ -1,6 +1,5 @@
 import logging
 
-
 import torch
 from torch import nn
 from torch.nn import functional as F
@@ -234,7 +233,6 @@ class HiddenLayer(nn.Module):
             (-1 * neg_badness) + self.settings.model.loss_threshold,
             pos_badness - self.settings.model.loss_threshold
         ])).mean()
-
         layer_loss.backward()
 
         self.optimizer.step()
