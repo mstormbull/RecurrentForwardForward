@@ -9,7 +9,7 @@ from RecurrentFF.util import (
     Activations,
     ForwardMode,
     layer_activations_to_badness,
-    standardize_layer_activations,
+    normalize_activations,
 )
 from RecurrentFF.settings import (
     Settings,
@@ -310,15 +310,15 @@ class HiddenLayer(nn.Module):
                 prev_act = self.predict_activations.previous
 
             prev_layer_prev_timestep_activations = prev_layer_prev_timestep_activations.detach()
-            prev_layer_stdized = standardize_layer_activations(
+            prev_layer_stdized = normalize_activations(
                 prev_layer_prev_timestep_activations, self.settings.model.epsilon)
 
             next_layer_prev_timestep_activations = next_layer_prev_timestep_activations.detach()
-            next_layer_stdized = standardize_layer_activations(
+            next_layer_stdized = normalize_activations(
                 next_layer_prev_timestep_activations, self.settings.model.epsilon)
 
             prev_act = prev_act.detach()
-            prev_act_stdized = standardize_layer_activations(
+            prev_act_stdized = normalize_activations(
                 prev_act, self.settings.model.epsilon)
 
             new_activation =  \
@@ -328,7 +328,7 @@ class HiddenLayer(nn.Module):
                 -1 * F.elu(F.linear(
                     next_layer_stdized,
                     self.next_layer.backward_linear.weight)) + \
-                self.prelu(F.linear(
+                F.leaky_relu(F.linear(
                     prev_act_stdized,
                     self.lateral_linear.weight))
 
@@ -349,7 +349,7 @@ class HiddenLayer(nn.Module):
                 prev_act = self.predict_activations.previous
 
             prev_act = prev_act.detach()
-            prev_act_stdized = standardize_layer_activations(
+            prev_act_stdized = normalize_activations(
                 prev_act, self.settings.model.epsilon)
 
             new_activation = \
@@ -359,7 +359,7 @@ class HiddenLayer(nn.Module):
                 -1 * F.elu(F.linear(
                     labels,
                     self.next_layer.backward_linear.weight)) + \
-                self.prelu(F.linear(
+                F.leaky_relu(F.linear(
                     prev_act_stdized,
                     self.lateral_linear.weight))
 
@@ -383,11 +383,11 @@ class HiddenLayer(nn.Module):
                 prev_act = self.predict_activations.previous
 
             next_layer_prev_timestep_activations = next_layer_prev_timestep_activations.detach()
-            next_layer_stdized = standardize_layer_activations(
+            next_layer_stdized = normalize_activations(
                 next_layer_prev_timestep_activations, self.settings.model.epsilon)
 
             prev_act = prev_act.detach()
-            prev_act_stdized = standardize_layer_activations(
+            prev_act_stdized = normalize_activations(
                 prev_act, self.settings.model.epsilon)
 
             new_activation = \
@@ -397,7 +397,7 @@ class HiddenLayer(nn.Module):
                 -1 * F.elu(F.linear(
                     next_layer_stdized,
                     self.next_layer.backward_linear.weight)) + \
-                self.prelu(F.linear(
+                F.leaky_relu(F.linear(
                     prev_act_stdized,
                     self.lateral_linear.weight))
 
@@ -421,11 +421,11 @@ class HiddenLayer(nn.Module):
                 prev_act = self.predict_activations.previous
 
             prev_layer_prev_timestep_activations = prev_layer_prev_timestep_activations.detach()
-            prev_layer_stdized = standardize_layer_activations(
+            prev_layer_stdized = normalize_activations(
                 prev_layer_prev_timestep_activations, self.settings.model.epsilon)
 
             prev_act = prev_act.detach()
-            prev_act_stdized = standardize_layer_activations(
+            prev_act_stdized = normalize_activations(
                 prev_act, self.settings.model.epsilon)
 
             new_activation = \
@@ -435,7 +435,7 @@ class HiddenLayer(nn.Module):
                 -1 * F.elu(F.linear(
                     labels,
                     self.next_layer.backward_linear.weight)) + \
-                self.prelu(F.linear(
+                F.leaky_relu(F.linear(
                     prev_act_stdized,
                     self.lateral_linear.weight))
 
