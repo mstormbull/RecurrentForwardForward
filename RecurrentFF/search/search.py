@@ -14,7 +14,7 @@ NUM_CLASSES = 10
 TRAIN_BATCH_SIZE = 500
 TEST_BATCH_SIZE = 5000
 
-DEVICE = "cuda"
+DEVICE = "mps"
 
 
 def run(settings: Settings):
@@ -69,15 +69,15 @@ if __name__ == "__main__":
     classifier_optimizers = ["rmsprop", "adam"]
 
     ff_rmsprop_momentums = [0.0, 0.2, 0.5, 0.7, 0.9]
-    ff_rmsprop_learning_rates = [0.00001, 0.0001, 0.001]
+    ff_rmsprop_learning_rates = [0.00001, 0.00005, 0.0001, 0.0005]
     classifier_rmsprop_momentums = [0.0, 0.2, 0.5, 0.7, 0.9]
-    classifier_rmsprop_learning_rates = [0.00001, 0.0001, 0.001]
+    classifier_rmsprop_learning_rates = [0.00001, 0.00005, 0.0001, 0.0005]
 
-    ff_adam_learning_rates = [0.00001, 0.0001, 0.001, 0.01]
-    classifier_adam_learning_rates = [0.0001, 0.001, 0.01]
+    ff_adam_learning_rates = [0.00001, 0.00005, 0.0001]
+    classifier_adam_learning_rates = [0.00001, 0.00005, 0.0001, 0.0005]
 
-    ff_adadelta_learning_rates = [0.00001, 0.0001, 0.001]
-    classifier_adadelta_learning_rates = [0.00001, 0.0001, 0.001]
+    ff_adadelta_learning_rates = [0.00001, 0.00005, 0.0001, 0.0005]
+    classifier_adadelta_learning_rates = [0.00001, 0.00005, 0.0001, 0.0005]
 
     train_batch_sizes = [200, 500, 1000, 2000]
     densities = [1]
