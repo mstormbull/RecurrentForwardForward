@@ -14,7 +14,7 @@ NUM_CLASSES = 10
 TRAIN_BATCH_SIZE = 500
 TEST_BATCH_SIZE = 5000
 
-DEVICE = "mps"
+DEVICE = "cuda"
 
 
 def run(settings: Settings):
@@ -57,12 +57,11 @@ def run(settings: Settings):
 if __name__ == "__main__":
     set_logging()
 
-    loss_thresholds = [0.75, 1, 1.25, 1.5, 1.75, 2]
+    loss_thresholds = [0.75, 1, 1.25]
 
     iterations = [10, 20]
 
-    hidden_sizes = [[2500, 2500, 2500], [
-        3000, 3000, 3000], [2000, 2000, 2000, 2000], [3000, 3000, 3000, 3000]]
+    hidden_sizes = [[500, 500, 500], [1000, 1000, 1000]]
 
     ff_act = ["relu"]
 
@@ -159,3 +158,5 @@ if __name__ == "__main__":
         print("-----------", str(p.exitcode))
         if p.exitcode != 0:
             exit(1)
+
+        break

@@ -322,13 +322,13 @@ class HiddenLayer(nn.Module):
                 prev_act, self.settings.model.epsilon)
 
             new_activation =  \
-                F.elu(F.linear(
+                F.relu(F.linear(
                     prev_layer_stdized,
                     self.forward_linear.weight)) + \
-                -1 * F.elu(F.linear(
+                -1 * F.relu(F.linear(
                     next_layer_stdized,
                     self.next_layer.backward_linear.weight)) + \
-                self.prelu(F.linear(
+                F.relu(F.linear(
                     prev_act_stdized,
                     self.lateral_linear.weight))
 
@@ -353,13 +353,13 @@ class HiddenLayer(nn.Module):
                 prev_act, self.settings.model.epsilon)
 
             new_activation = \
-                F.elu(F.linear(
+                F.relu(F.linear(
                     data,
                     self.forward_linear.weight)) + \
-                -1 * F.elu(F.linear(
+                -1 * F.relu(F.linear(
                     labels,
                     self.next_layer.backward_linear.weight)) + \
-                self.prelu(F.linear(
+                F.relu(F.linear(
                     prev_act_stdized,
                     self.lateral_linear.weight))
 
@@ -391,13 +391,13 @@ class HiddenLayer(nn.Module):
                 prev_act, self.settings.model.epsilon)
 
             new_activation = \
-                F.elu(F.linear(
+                F.relu(F.linear(
                     data,
                     self.forward_linear.weight)) + \
-                -1 * F.elu(F.linear(
+                -1 * F.relu(F.linear(
                     next_layer_stdized,
                     self.next_layer.backward_linear.weight)) + \
-                self.prelu(F.linear(
+                F.relu(F.linear(
                     prev_act_stdized,
                     self.lateral_linear.weight))
 
@@ -429,13 +429,13 @@ class HiddenLayer(nn.Module):
                 prev_act, self.settings.model.epsilon)
 
             new_activation = \
-                F.elu(F.linear(
+                F.relu(F.linear(
                     prev_layer_stdized,
                     self.forward_linear.weight)) + \
-                -1 * F.elu(F.linear(
+                -1 * F.relu(F.linear(
                     labels,
                     self.next_layer.backward_linear.weight)) + \
-                self.prelu(F.linear(
+                F.relu(F.linear(
                     prev_act_stdized,
                     self.lateral_linear.weight))
 

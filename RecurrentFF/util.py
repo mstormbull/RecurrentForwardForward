@@ -16,17 +16,18 @@ def set_logging():
 
 def standardize_layer_activations(layer_activations, epsilon):
 
-    # Compute mean and standard deviation for prev_layer
-    prev_layer_mean = layer_activations.mean(
-        dim=1, keepdim=True)
-    prev_layer_std = layer_activations.std(
-        dim=1, keepdim=True)
+    # # Compute mean and standard deviation for prev_layer
+    # prev_layer_mean = layer_activations.mean(
+    #     dim=1, keepdim=True)
+    # prev_layer_std = layer_activations.std(
+    #     dim=1, keepdim=True)
 
-    # Apply standardization
-    prev_layer_stdized = (layer_activations - prev_layer_mean) / \
-        (prev_layer_std + epsilon)
+    # # Apply standardization
+    # prev_layer_stdized = (layer_activations - prev_layer_mean) / \
+    #     (prev_layer_std + epsilon)
 
-    return prev_layer_stdized
+    # return prev_layer_stdized
+    return layer_activations
 
 
 # input of dims (frames, batch size, input size)

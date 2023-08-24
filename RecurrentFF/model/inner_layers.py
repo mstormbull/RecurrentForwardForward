@@ -2,6 +2,7 @@ import logging
 
 
 from torch import nn
+import wandb
 
 
 class InnerLayers(nn.Module):
@@ -42,7 +43,7 @@ class InnerLayers(nn.Module):
             training each layer, their stored activations are advanced by
             calling the 'advance_stored_activations' method.
         """
-        total_loss = 0
+        losses_per_layer = [0 for _ in self.layers]
         for i, layer in enumerate(self.layers):
             logging.debug("Training layer " + str(i))
             loss = None
@@ -54,14 +55,24 @@ class InnerLayers(nn.Module):
                 loss = layer.train(None, label_data, should_damp)
             else:
                 loss = layer.train(None, None, should_damp)
-            total_loss += loss
-            logging.debug("Loss for layer " + str(i) + ": " + str(loss))
+
+            layer_num = i+1
+            logging.debug("Loss for layer " +
+                          str(layer_num) + ": " + str(loss))
+
+            losses_per_layer[i] += loss
 
         logging.debug("Trained activations for layer " +
                       str(i))
 
         for layer in self.layers:
             layer.advance_stored_activations()
+
+        for i, layer in enumerate(self.layers):
+            layer_num = i+1
+            wandb.log({f"loss (layer {layer_num})": loss})
+
+        total_loss = sum(losses_per_layer)
 
         return total_loss
 
