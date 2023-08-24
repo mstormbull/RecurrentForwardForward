@@ -60,6 +60,9 @@ class InnerLayers(nn.Module):
             logging.debug("Loss for layer " +
                           str(layer_num) + ": " + str(loss))
 
+            metric_name = "granular_loss (layer " + str(layer_num) + ")"
+            wandb.log({metric_name: loss})
+
             losses_per_layer[i] += loss
 
         logging.debug("Trained activations for layer " +
@@ -68,13 +71,7 @@ class InnerLayers(nn.Module):
         for layer in self.layers:
             layer.advance_stored_activations()
 
-        for i, layer in enumerate(self.layers):
-            layer_num = i+1
-            wandb.log({f"loss (layer {layer_num})": loss})
-
-        total_loss = sum(losses_per_layer)
-
-        return total_loss
+        return losses_per_layer
 
     def advance_layers_forward(
             self,
