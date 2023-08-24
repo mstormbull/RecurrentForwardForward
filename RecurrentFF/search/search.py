@@ -81,6 +81,7 @@ if __name__ == "__main__":
 
     train_batch_sizes = [200, 500, 1000, 2000]
     densities = [1]
+    damping_factors = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
 
     seen = set()
 
@@ -106,6 +107,7 @@ if __name__ == "__main__":
         classifier_adadelta_learning_rate = random.choice(
             classifier_adadelta_learning_rates)
         density = random.choice(densities)
+        damping_factor = random.choice(damping_factors)
 
         # construct settings
         settings = Settings.new()
@@ -132,6 +134,7 @@ if __name__ == "__main__":
         settings.model.ff_optimizer = ff_opt
         settings.model.classifier_optimizer = classifier_opt
         settings.model.interconnect_density = density
+        settings.model.damping_factor = damping_factor
 
         if ff_opt == "rmsprop":
             settings.model.ff_rmsprop.momentum = ff_rmsprop_momentum
