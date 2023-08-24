@@ -14,6 +14,8 @@ NUM_CLASSES = 10
 TRAIN_BATCH_SIZE = 500
 TEST_BATCH_SIZE = 5000
 
+DEVICE = "mps"
+
 
 def run(settings: Settings):
     # Needs to be done here as well because multiprocessing.
@@ -44,9 +46,12 @@ def run(settings: Settings):
     # Create and run model.
     model = RecurrentFFNet(settings).to(settings.device.device)
 
-    model.train(train_loader, test_loader)
-
-    print("======================FINISHED RUN============================")
+    try:
+        model.train(train_loader, test_loader)
+        print("======================FINISHED RUN============================")
+    except KeyboardInterrupt:
+        print("======================FINISHED RUN============================")
+        exit(0)
 
 
 if __name__ == "__main__":
@@ -54,19 +59,19 @@ if __name__ == "__main__":
 
     loss_thresholds = [0.75, 1, 1.25, 1.5, 1.75, 2]
 
-    iterations = [10, 20, 30]
+    iterations = [10, 20]
 
     hidden_sizes = [[2500, 2500, 2500], [
         3000, 3000, 3000], [2000, 2000, 2000, 2000], [3000, 3000, 3000, 3000]]
 
     ff_act = ["relu"]
 
-    ff_optimizers = ["rmsprop", "adam", "adadelta"]
-    classifier_optimizers = ["rmsprop", "adam", "adadelta"]
+    ff_optimizers = ["rmsprop", "adam"]
+    classifier_optimizers = ["rmsprop", "adam"]
 
-    ff_rmsprop_momentums = [0.0, 0.2, 0.5, 0.9]
+    ff_rmsprop_momentums = [0.0, 0.2, 0.5, 0.7, 0.9]
     ff_rmsprop_learning_rates = [0.00001, 0.0001, 0.001]
-    classifier_rmsprop_momentums = [0.0, 0.2, 0.5, 0.9]
+    classifier_rmsprop_momentums = [0.0, 0.2, 0.5, 0.7, 0.9]
     classifier_rmsprop_learning_rates = [0.00001, 0.0001, 0.001]
 
     ff_adam_learning_rates = [0.00001, 0.0001, 0.001, 0.01]
@@ -75,7 +80,8 @@ if __name__ == "__main__":
     ff_adadelta_learning_rates = [0.00001, 0.0001, 0.001]
     classifier_adadelta_learning_rates = [0.00001, 0.0001, 0.001]
 
-    train_batch_sizes = [100, 200, 500, 1000, 2000]
+    train_batch_sizes = [200, 500, 1000, 2000]
+    densities = [1]
 
     seen = set()
 
@@ -100,33 +106,12 @@ if __name__ == "__main__":
         ff_adadelta_learning_rate = random.choice(ff_adadelta_learning_rates)
         classifier_adadelta_learning_rate = random.choice(
             classifier_adadelta_learning_rates)
-
-        # track id so no dup runs
-        unique_run_id = str(loss_threshold) + str(hidden_sizes) + "," + str(act) + "," + \
-            str(ff_opt) + "," + str(classifier_opt)
-
-        if ff_opt == "rmsprop":
-            unique_run_id += "," + str(ff_rmsprop_learning_rate) + "," + \
-                str(ff_rmsprop_momentum)
-        elif ff_opt == "adam":
-            unique_run_id += "," + \
-                str(ff_adam_learning_rate)
-        elif ff_opt == "adadelta":
-            unique_run_id += "," + \
-                str(ff_adadelta_learning_rate)
-
-        if classifier_opt == "rmsprop":
-            unique_run_id += "," + str(classifier_rmsprop_learning_rate) + "," + \
-                str(classifier_rmsprop_momentum)
-        elif classifier_opt == "adam":
-            unique_run_id += "," + \
-                str(classifier_adam_learning_rate)
-        elif classifier_opt == "adadelta":
-            unique_run_id += "," + \
-                str(classifier_adadelta_learning_rate)
+        density = random.choice(densities)
 
         # construct settings
         settings = Settings.new()
+
+        settings.device.device = DEVICE
 
         data_config = {
             "data_size": DATA_SIZE,
@@ -147,6 +132,7 @@ if __name__ == "__main__":
         settings.model.ff_activation = act
         settings.model.ff_optimizer = ff_opt
         settings.model.classifier_optimizer = classifier_opt
+        settings.model.interconnect_density = density
 
         if ff_opt == "rmsprop":
             settings.model.ff_rmsprop.momentum = ff_rmsprop_momentum
@@ -165,11 +151,11 @@ if __name__ == "__main__":
             settings.model.classifier_adadelta.learning_rate = classifier_adadelta_learning_rate
 
         # run hyperparams
-        if unique_run_id not in seen:
-            p = Process(target=run, args=(
-                settings,
-            ))
-            p.start()
-            p.join()
-
-        seen.add(unique_run_id)
+        p = Process(target=run, args=(
+            settings,
+        ))
+        p.start()
+        p.join()
+        print("-----------", str(p.exitcode))
+        if p.exitcode != 0:
+            exit(1)
