@@ -27,10 +27,10 @@ def standardize_layer_activations(layer_activations, epsilon):
     #     (prev_layer_std + epsilon)
 
     # return prev_layer_stdized
-    l2_norm = layer_activations.norm(p=2, dim=1, keepdim=True)
-
+    l2_norm = torch.linalg.vector_norm(layer_activations, ord=2, dim=1, keepdim=True)
+    
     normalized_activations = layer_activations / (l2_norm + epsilon)
-
+    
     return normalized_activations
 
 
