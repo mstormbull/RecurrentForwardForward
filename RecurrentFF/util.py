@@ -56,42 +56,6 @@ class TrainInputData:
         self.pos_input = self.pos_input.to(device)
         self.neg_input = self.neg_input.to(device)
 
-    def jitter_inplace(self):
-        # Define a random jitter transformation
-        transform = transforms.RandomAffine(
-            degrees=10, translate=(0.1, 0.1), scale=(0.9, 1.1), shear=5)
-
-        # Iterate over the batch dimension
-        for i in range(self.pos_input.shape[1]):
-            # Apply the same transformation to all frames in a batch
-            transformed_image = transform(
-                self.pos_input[:, i].reshape(-1, 28, 28))
-            self.pos_input[:, i] = transformed_image.reshape(-1, 784)
-
-            transformed_image = transform(
-                self.neg_input[:, i].reshape(-1, 28, 28))
-            self.neg_input[:, i] = transformed_image.reshape(-1, 784)
-
-        # # Debugging visualization
-        # num_samples = self.pos_input.shape[1]
-        # for i in range(num_samples):
-        #     plt.figure(figsize=(10, 5))
-
-        #     # Displaying positive input
-        #     plt.subplot(1, 2, 1)
-        #     plt.imshow(self.pos_input[0, i].reshape(
-        #         28, 28).cpu().numpy(), cmap='gray')
-        #     plt.title(f'Pos Sample {i}')
-
-        #     # Displaying negative input
-        #     plt.subplot(1, 2, 2)
-        #     plt.imshow(self.neg_input[0, i].reshape(
-        #         28, 28).cpu().numpy(), cmap='gray')
-        #     plt.title(f'Neg Sample {i}')
-
-        #     plt.show()
-        #     input()
-
 
 # input of dims (frames, batch size, num classes)
 class TrainLabelData:

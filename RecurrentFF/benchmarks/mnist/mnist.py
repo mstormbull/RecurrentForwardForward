@@ -2,6 +2,7 @@ import torch
 from torch.utils.data import DataLoader, Dataset
 from torchvision.datasets import MNIST
 from torchvision.transforms import Compose, ToTensor, Normalize, Lambda
+from torchvision import transforms
 import wandb
 
 from RecurrentFF.model.data_scenario.static_single_class import SingleStaticClassTestData
@@ -154,6 +155,8 @@ def test_collate_fn(batch):
 def MNIST_loaders(train_batch_size, test_batch_size):
     transform = Compose([
         ToTensor(),
+        transforms.RandomAffine(
+            degrees=10, translate=(0.1, 0.1), scale=(0.9, 1.1), shear=5),
         Normalize((0.1307,), (0.3081,)),
         Lambda(lambda x: torch.flatten(x))])
 
@@ -167,7 +170,7 @@ def MNIST_loaders(train_batch_size, test_batch_size):
         batch_size=train_batch_size,
         shuffle=True,
         collate_fn=train_collate_fn,
-        num_workers=0)
+        num_workers=8)
 
     test_loader = DataLoader(
         CustomTestDataset(
@@ -179,7 +182,7 @@ def MNIST_loaders(train_batch_size, test_batch_size):
         batch_size=test_batch_size,
         shuffle=True,
         collate_fn=test_collate_fn,
-        num_workers=0)
+        num_workers=8)
 
     return train_loader, test_loader
 

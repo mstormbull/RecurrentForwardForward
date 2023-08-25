@@ -10,7 +10,6 @@ epsilon = 0.00000001
 skip_profiling = 1
 should_log_metrics = true 
 should_replace_neg_data = true 
-should_jitter_image = true
 ff_activation = "relu"
 ff_optimizer = "rmsprop"
 classifier_optimizer = "adam"

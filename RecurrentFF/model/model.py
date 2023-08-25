@@ -140,9 +140,6 @@ class RecurrentFFNet(nn.Module):
                 input_data.move_to_device_inplace(self.settings.device.device)
                 label_data.move_to_device_inplace(self.settings.device.device)
 
-                if self.settings.model.should_jitter_image:
-                    input_data.jitter_inplace()
-
                 if self.settings.model.should_replace_neg_data:
                     self.processor.replace_negative_data_inplace(
                         input_data.pos_input, label_data)
