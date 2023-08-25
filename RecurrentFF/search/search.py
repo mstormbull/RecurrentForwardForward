@@ -14,7 +14,7 @@ NUM_CLASSES = 10
 TRAIN_BATCH_SIZE = 500
 TEST_BATCH_SIZE = 5000
 
-DEVICE = "mps"
+DEVICE = "cuda"
 
 
 def run(settings: Settings):
@@ -81,7 +81,7 @@ if __name__ == "__main__":
 
     train_batch_sizes = [200, 500, 1000, 2000]
     densities = [1]
-    damping_factors = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
+    damping_factors = [0.1, 0.2, 0.3, 0.4, 0.5]
 
     seen = set()
 

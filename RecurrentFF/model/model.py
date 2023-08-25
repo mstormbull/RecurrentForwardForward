@@ -140,6 +140,9 @@ class RecurrentFFNet(nn.Module):
                 input_data.move_to_device_inplace(self.settings.device.device)
                 label_data.move_to_device_inplace(self.settings.device.device)
 
+                if self.settings.model.should_jitter_image:
+                    input_data.jitter_inplace()
+
                 if self.settings.model.should_replace_neg_data:
                     self.processor.replace_negative_data_inplace(
                         input_data.pos_input, label_data)
@@ -167,6 +170,7 @@ class RecurrentFFNet(nn.Module):
         for preinit_step in range(0, len(self.inner_layers)):
             logging.debug("Preinitialization step: " +
                           str(preinit_step))
+            # print("------preinit step: " + str(preinit_step) + "------")
 
             pos_input = input_data.pos_input[0]
             neg_input = input_data.neg_input[0]
@@ -202,7 +206,8 @@ class RecurrentFFNet(nn.Module):
                 for i in range(len(loss_per_layer)):
                     loss_per_layer[i] += losses_per_layer_[i]
 
-            average_layer_loss_one_iteration = (sum(loss_per_layer) / len(self.inner_layers)).item()
+            average_layer_loss_one_iteration = (
+                sum(loss_per_layer) / len(self.inner_layers)).item()
             logging.debug("Average layer loss: " +
                           str(average_layer_loss_one_iteration))
 
@@ -238,7 +243,7 @@ class RecurrentFFNet(nn.Module):
             len(layer_badnesses) for layer_badnesses in zip(
                 *
                 neg_badness_per_layer)]
-        
+
         for i, _loss in enumerate(loss_per_layer):
             loss_per_layer[i] = _loss / iterations
 
@@ -290,7 +295,7 @@ class RecurrentFFNet(nn.Module):
                        "first_layer_pos_badness": first_layer_pos_badness,
                        "first_layer_neg_badness": first_layer_neg_badness,
                        "epoch": epoch})
-        
+
         for i, loss in enumerate(loss_per_layer):
             layer_num = i + 1
             metric_name = "loss (layer " + str(layer_num) + ")"

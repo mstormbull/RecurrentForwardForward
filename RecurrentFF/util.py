@@ -1,9 +1,14 @@
 from enum import Enum
 import logging
-import torch
-from torch import nn
 
 from RecurrentFF.settings import Settings
+from torchvision import transforms
+from torch import nn
+import torch
+
+import matplotlib
+from matplotlib import pyplot as plt
+matplotlib.use('TkAgg')
 
 
 def set_logging():
@@ -21,17 +26,19 @@ def standardize_layer_activations(layer_activations, epsilon):
     #     dim=1, keepdim=True)
     # prev_layer_std = layer_activations.std(
     #     dim=1, keepdim=True)
-
     # # Apply standardization
     # prev_layer_stdized = (layer_activations - prev_layer_mean) / \
     #     (prev_layer_std + epsilon)
-
     # return prev_layer_stdized
-    l2_norm = torch.linalg.vector_norm(layer_activations, ord=2, dim=1, keepdim=True)
-    
-    normalized_activations = layer_activations / (l2_norm + epsilon)
-    
+
+    squared_activations = layer_activations ** 2
+    mean_squared = torch.mean(squared_activations, dim=1, keepdim=True)
+    l2_norm = torch.sqrt(mean_squared + epsilon)
+
+    normalized_activations = layer_activations / l2_norm
     return normalized_activations
+
+    # return layer_activations
 
 
 # input of dims (frames, batch size, input size)
@@ -48,6 +55,42 @@ class TrainInputData:
     def move_to_device_inplace(self, device):
         self.pos_input = self.pos_input.to(device)
         self.neg_input = self.neg_input.to(device)
+
+    def jitter_inplace(self):
+        # Define a random jitter transformation
+        transform = transforms.RandomAffine(
+            degrees=10, translate=(0.1, 0.1), scale=(0.9, 1.1), shear=5)
+
+        # Iterate over the batch dimension
+        for i in range(self.pos_input.shape[1]):
+            # Apply the same transformation to all frames in a batch
+            transformed_image = transform(
+                self.pos_input[:, i].reshape(-1, 28, 28))
+            self.pos_input[:, i] = transformed_image.reshape(-1, 784)
+
+            transformed_image = transform(
+                self.neg_input[:, i].reshape(-1, 28, 28))
+            self.neg_input[:, i] = transformed_image.reshape(-1, 784)
+
+        # # Debugging visualization
+        # num_samples = self.pos_input.shape[1]
+        # for i in range(num_samples):
+        #     plt.figure(figsize=(10, 5))
+
+        #     # Displaying positive input
+        #     plt.subplot(1, 2, 1)
+        #     plt.imshow(self.pos_input[0, i].reshape(
+        #         28, 28).cpu().numpy(), cmap='gray')
+        #     plt.title(f'Pos Sample {i}')
+
+        #     # Displaying negative input
+        #     plt.subplot(1, 2, 2)
+        #     plt.imshow(self.neg_input[0, i].reshape(
+        #         28, 28).cpu().numpy(), cmap='gray')
+        #     plt.title(f'Neg Sample {i}')
+
+        #     plt.show()
+        #     input()
 
 
 # input of dims (frames, batch size, num classes)

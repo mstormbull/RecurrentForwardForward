@@ -228,12 +228,33 @@ class HiddenLayer(nn.Module):
         neg_badness = layer_activations_to_badness(neg_activations)
 
         # Loss function equivelent to:
-        # L = log(1 + exp(((-n + 2) + (p - 2))/2)
+        # plot3d log(1 + exp(-n + 1)) + log(1 + exp(p - 1)) for n=0 to 3, p=0 to 3
         layer_loss = F.softplus(torch.cat([
             (-1 * neg_badness) + self.settings.model.loss_threshold,
             pos_badness - self.settings.model.loss_threshold
         ])).mean()
         layer_loss.backward()
+
+        if self.train_activations_dim[1] == 5:
+            # print the gradients of all weights
+            print("previous layer weights: ", self.forward_linear.weight)
+            print()
+            print("previous layer weights grad: ",
+                  self.forward_linear.weight.grad)
+            print()
+            print("next layer weights: ",
+                  self.next_layer.backward_linear.weight)
+            print()
+            print("next layer weights grad: ",
+                  self.next_layer.backward_linear.weight.grad)
+            print()
+            print("lateral layer weights: ", self.lateral_linear.weight)
+            print()
+            print("lateral layer weights grad: ",
+                  self.lateral_linear.weight.grad)
+            # print a line of equals
+            print("=" * 100)
+            input()
 
         self.optimizer.step()
         self.optimizer.zero_grad()
@@ -321,14 +342,22 @@ class HiddenLayer(nn.Module):
             prev_act_stdized = standardize_layer_activations(
                 prev_act, self.settings.model.epsilon)
 
+            if self.train_activations_dim[1] == 5 and mode == ForwardMode.PositiveData:
+                # print("previous activation shape: ", prev_act.shape)
+                # print("previous activations: ", prev_act)
+                # print()
+                # print("previous activations standardized: ", prev_act_stdized)
+                # input()
+                pass
+
             new_activation =  \
-                F.relu(F.linear(
+                F.leaky_relu(F.linear(
                     prev_layer_stdized,
                     self.forward_linear.weight)) + \
-                -1 * F.relu(F.linear(
+                -1 * F.leaky_relu(F.linear(
                     next_layer_stdized,
                     self.next_layer.backward_linear.weight)) + \
-                F.relu(F.linear(
+                F.leaky_relu(F.linear(
                     prev_act_stdized,
                     self.lateral_linear.weight))
 
@@ -353,13 +382,13 @@ class HiddenLayer(nn.Module):
                 prev_act, self.settings.model.epsilon)
 
             new_activation = \
-                F.relu(F.linear(
+                F.leaky_relu(F.linear(
                     data,
                     self.forward_linear.weight)) + \
-                -1 * F.relu(F.linear(
+                -1 * F.leaky_relu(F.linear(
                     labels,
                     self.next_layer.backward_linear.weight)) + \
-                F.relu(F.linear(
+                F.leaky_relu(F.linear(
                     prev_act_stdized,
                     self.lateral_linear.weight))
 
@@ -391,13 +420,13 @@ class HiddenLayer(nn.Module):
                 prev_act, self.settings.model.epsilon)
 
             new_activation = \
-                F.relu(F.linear(
+                F.leaky_relu(F.linear(
                     data,
                     self.forward_linear.weight)) + \
-                -1 * F.relu(F.linear(
+                -1 * F.leaky_relu(F.linear(
                     next_layer_stdized,
                     self.next_layer.backward_linear.weight)) + \
-                F.relu(F.linear(
+                F.leaky_relu(F.linear(
                     prev_act_stdized,
                     self.lateral_linear.weight))
 
@@ -429,13 +458,13 @@ class HiddenLayer(nn.Module):
                 prev_act, self.settings.model.epsilon)
 
             new_activation = \
-                F.relu(F.linear(
+                F.leaky_relu(F.linear(
                     prev_layer_stdized,
                     self.forward_linear.weight)) + \
-                -1 * F.relu(F.linear(
+                -1 * F.leaky_relu(F.linear(
                     labels,
                     self.next_layer.backward_linear.weight)) + \
-                F.relu(F.linear(
+                F.leaky_relu(F.linear(
                     prev_act_stdized,
                     self.lateral_linear.weight))
 

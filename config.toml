@@ -1,15 +1,16 @@
 [device]
-device = "mps"
+device = "cuda"
 
 [model]
-hidden_sizes = [250, 250, 250]
+hidden_sizes = [500, 500, 500]
 epochs = 275
 loss_threshold = 1.5
 damping_factor = 0.7
 epsilon = 0.00000001
 skip_profiling = 1
 should_log_metrics = true 
-should_replace_neg_data = true
+should_replace_neg_data = true 
+should_jitter_image = true
 ff_activation = "relu"
 ff_optimizer = "rmsprop"
 classifier_optimizer = "adam"
