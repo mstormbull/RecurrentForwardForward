@@ -27,10 +27,15 @@ def standardize_layer_activations(layer_activations, epsilon):
     #     (prev_layer_std + epsilon)
 
     # return prev_layer_stdized
-    return layer_activations
+    l2_norm = layer_activations.norm(p=2, dim=1, keepdim=True)
+
+    normalized_activations = layer_activations / (l2_norm + epsilon)
+
+    return normalized_activations
 
 
 # input of dims (frames, batch size, input size)
+
 class TrainInputData:
     def __init__(self, pos_input, neg_input):
         self.pos_input = pos_input
