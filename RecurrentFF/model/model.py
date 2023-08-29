@@ -10,10 +10,9 @@ from RecurrentFF.model.data_scenario.static_single_class import (
     StaticSingleClassProcessor,
 )
 from RecurrentFF.model.hidden_layer import HiddenLayer
-from RecurrentFF.model.inner_layers import InnerLayers
+from RecurrentFF.model.inner_layers import InnerLayers, LayerMetrics
 from RecurrentFF.util import (
     ForwardMode,
-    OutputLayer,
     LatentAverager,
     layer_activations_to_badness,
 )
@@ -70,30 +69,29 @@ class RecurrentFFNet(nn.Module):
 
         inner_layers = nn.ModuleList()
         prev_size = self.settings.data_config.data_size
-        for size in self.settings.model.hidden_sizes:
+        for i, size in enumerate(self.settings.model.hidden_sizes):
+            next_size = self.settings.model.hidden_sizes[i + 1] if i < len(
+                self.settings.model.hidden_sizes) - 1 else self.settings.data_config.num_classes
+
             hidden_layer = HiddenLayer(
                 self.settings,
                 self.settings.data_config.train_batch_size,
                 self.settings.data_config.test_batch_size,
                 prev_size,
                 size,
+                next_size,
                 self.settings.model.damping_factor)
             inner_layers.append(hidden_layer)
             prev_size = size
 
-        self.output_layer = OutputLayer(
-            self.settings.model.hidden_sizes[-1], self.settings.data_config.num_classes)
-
         # attach layers to each other
-        for i, hidden_layer in enumerate(inner_layers):
-            if i != 0:
-                hidden_layer.set_previous_layer(inner_layers[i - 1])
+        for i in range(1, len(inner_layers)):
+            hidden_layer = inner_layers[i]
+            hidden_layer.set_previous_layer(inner_layers[i - 1])
 
-        for i, hidden_layer in enumerate(inner_layers):
-            if i != len(inner_layers) - 1:
-                hidden_layer.set_next_layer(inner_layers[i + 1])
-            else:
-                hidden_layer.set_next_layer(self.output_layer)
+        for i in range(0, len(inner_layers) - 1):
+            hidden_layer = inner_layers[i]
+            hidden_layer.set_next_layer(inner_layers[i + 1])
 
         self.inner_layers = InnerLayers(self.settings, inner_layers)
 
@@ -142,10 +140,10 @@ class RecurrentFFNet(nn.Module):
 
                 if self.settings.model.should_replace_neg_data:
                     self.processor.replace_negative_data_inplace(
-                        input_data.pos_input, label_data)
+                        input_data.pos_input, label_data, epoch)
 
-                average_layer_loss, pos_badness_per_layer, neg_badness_per_layer = self.__train_batch(
-                    batch_num, input_data, label_data)
+                layer_metrics, pos_badness_per_layer, neg_badness_per_layer = self.__train_batch(
+                    batch_num, input_data, label_data, epoch)
 
             # Get some observability into prediction while training.
             accuracy = self.processor.brute_force_predict(
@@ -153,12 +151,12 @@ class RecurrentFFNet(nn.Module):
 
             self.__log_metrics(
                 accuracy,
-                average_layer_loss,
+                layer_metrics,
                 pos_badness_per_layer,
                 neg_badness_per_layer,
                 epoch)
 
-    def __train_batch(self, batch_num, input_data, label_data):
+    def __train_batch(self, batch_num, input_data, label_data, epoch):
         logging.info("Batch: " + str(batch_num))
 
         self.inner_layers.reset_activations(True)
@@ -166,6 +164,7 @@ class RecurrentFFNet(nn.Module):
         for preinit_step in range(0, len(self.inner_layers)):
             logging.debug("Preinitialization step: " +
                           str(preinit_step))
+            # print("------preinit step: " + str(preinit_step) + "------")
 
             pos_input = input_data.pos_input[0]
             neg_input = input_data.neg_input[0]
@@ -178,10 +177,13 @@ class RecurrentFFNet(nn.Module):
             self.inner_layers.advance_layers_forward(
                 ForwardMode.NegativeData, neg_input, preinit_upper_clamped_tensor, False)
 
+        num_layers = len(self.settings.model.hidden_sizes)
+        layer_metrics = LayerMetrics(num_layers)
+
         pos_badness_per_layer = []
         neg_badness_per_layer = []
-        pos_target_latents = LatentAverager()
         iterations = input_data.pos_input.shape[0]
+        pos_target_latents = LatentAverager()
         for iteration in range(0, iterations):
             logging.debug("Iteration: " + str(iteration))
 
@@ -192,11 +194,8 @@ class RecurrentFFNet(nn.Module):
                 label_data.pos_labels[iteration],
                 label_data.neg_labels[iteration])
 
-            total_loss = self.inner_layers.advance_layers_train(
-                input_data_sample, label_data_sample, True)
-            average_layer_loss = (total_loss / len(self.inner_layers)).item()
-            logging.debug("Average layer loss: " +
-                          str(average_layer_loss))
+            self.inner_layers.advance_layers_train(
+                input_data_sample, label_data_sample, True, layer_metrics)
 
             lower_iteration_threshold = iterations // 2 - \
                 iterations // 10
@@ -218,7 +217,7 @@ class RecurrentFFNet(nn.Module):
         if self.settings.model.should_replace_neg_data:
             pos_target_latents = pos_target_latents.retrieve()
             self.processor.train_class_predictor_from_latents(
-                pos_target_latents, label_data.pos_labels[0])
+                pos_target_latents, label_data.pos_labels[0], epoch)
 
         pos_badness_per_layer = [
             sum(layer_badnesses) /
@@ -231,12 +230,12 @@ class RecurrentFFNet(nn.Module):
                 *
                 neg_badness_per_layer)]
 
-        return average_layer_loss, pos_badness_per_layer, neg_badness_per_layer
+        return layer_metrics, pos_badness_per_layer, neg_badness_per_layer
 
     def __log_metrics(
             self,
             accuracy,
-            average_layer_loss,
+            layer_metrics: LayerMetrics,
             pos_badness_per_layer,
             neg_badness_per_layer,
             epoch):
@@ -252,6 +251,9 @@ class RecurrentFFNet(nn.Module):
             # No-op as there may not be 3 layers
             pass
 
+        layer_metrics.log_metrics(epoch)
+        average_layer_loss = layer_metrics.average_layer_loss()
+
         if len(self.inner_layers) >= 3:
             wandb.log({"acc": accuracy,
                        "loss": average_layer_loss,
@@ -261,7 +263,8 @@ class RecurrentFFNet(nn.Module):
                        "first_layer_neg_badness": first_layer_neg_badness,
                        "second_layer_neg_badness": second_layer_neg_badness,
                        "third_layer_neg_badness": third_layer_neg_badness,
-                       "epoch": epoch})
+                       "epoch": epoch},
+                      step=epoch)
         elif len(self.inner_layers) == 2:
             wandb.log({"acc": accuracy,
                        "loss": average_layer_loss,
@@ -269,10 +272,13 @@ class RecurrentFFNet(nn.Module):
                        "second_layer_pos_badness": second_layer_pos_badness,
                        "first_layer_neg_badness": first_layer_neg_badness,
                        "second_layer_neg_badness": second_layer_neg_badness,
-                       "epoch": epoch})
+                       "epoch": epoch},
+                      step=epoch)
+
         elif len(self.inner_layers) == 1:
             wandb.log({"acc": accuracy,
                        "loss": average_layer_loss,
                        "first_layer_pos_badness": first_layer_pos_badness,
                        "first_layer_neg_badness": first_layer_neg_badness,
-                       "epoch": epoch})
+                       "epoch": epoch},
+                      step=epoch)

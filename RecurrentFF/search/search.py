@@ -57,12 +57,11 @@ def run(settings: Settings):
 if __name__ == "__main__":
     set_logging()
 
-    loss_thresholds = [0.75, 1, 1.25, 1.5, 1.75, 2]
+    loss_thresholds = [0.75, 1, 1.25]
 
     iterations = [10, 20]
 
-    hidden_sizes = [[2500, 2500, 2500], [
-        3000, 3000, 3000], [2000, 2000, 2000, 2000], [3000, 3000, 3000, 3000]]
+    hidden_sizes = [[500, 500, 500], [1000, 1000, 1000]]
 
     ff_act = ["relu"]
 
@@ -70,20 +69,19 @@ if __name__ == "__main__":
     classifier_optimizers = ["rmsprop", "adam"]
 
     ff_rmsprop_momentums = [0.0, 0.2, 0.5, 0.7, 0.9]
-    ff_rmsprop_learning_rates = [0.00001, 0.0001, 0.001]
+    ff_rmsprop_learning_rates = [0.00001, 0.00005, 0.0001, 0.0005]
     classifier_rmsprop_momentums = [0.0, 0.2, 0.5, 0.7, 0.9]
-    classifier_rmsprop_learning_rates = [0.00001, 0.0001, 0.001]
+    classifier_rmsprop_learning_rates = [0.00001, 0.00005, 0.0001, 0.0005]
 
-    ff_adam_learning_rates = [0.00001, 0.0001, 0.001, 0.01]
-    classifier_adam_learning_rates = [0.0001, 0.001, 0.01]
+    ff_adam_learning_rates = [0.00001, 0.00005, 0.0001]
+    classifier_adam_learning_rates = [0.00001, 0.00005, 0.0001, 0.0005]
 
-    ff_adadelta_learning_rates = [0.00001, 0.0001, 0.001]
-    classifier_adadelta_learning_rates = [0.00001, 0.0001, 0.001]
+    ff_adadelta_learning_rates = [0.00001, 0.00005, 0.0001, 0.0005]
+    classifier_adadelta_learning_rates = [0.00001, 0.00005, 0.0001, 0.0005]
 
     train_batch_sizes = [200, 500, 1000, 2000]
     densities = [1]
-
-    seen = set()
+    damping_factors = [0.3, 0.4, 0.5, 0.6, 0.7]
 
     while True:
         # random hyperparams
@@ -107,6 +105,7 @@ if __name__ == "__main__":
         classifier_adadelta_learning_rate = random.choice(
             classifier_adadelta_learning_rates)
         density = random.choice(densities)
+        damping_factor = random.choice(damping_factors)
 
         # construct settings
         settings = Settings.new()
@@ -133,6 +132,7 @@ if __name__ == "__main__":
         settings.model.ff_optimizer = ff_opt
         settings.model.classifier_optimizer = classifier_opt
         settings.model.interconnect_density = density
+        settings.model.damping_factor = damping_factor
 
         if ff_opt == "rmsprop":
             settings.model.ff_rmsprop.momentum = ff_rmsprop_momentum
@@ -159,3 +159,5 @@ if __name__ == "__main__":
         print("-----------", str(p.exitcode))
         if p.exitcode != 0:
             exit(1)
+
+        break

@@ -1,9 +1,7 @@
 from enum import Enum
 import logging
-import torch
-from torch import nn
 
-from RecurrentFF.settings import Settings
+import torch
 
 
 def set_logging():
@@ -15,22 +13,19 @@ def set_logging():
 
 
 def standardize_layer_activations(layer_activations, epsilon):
+    squared_activations = layer_activations ** 2
+    mean_squared = torch.mean(squared_activations, dim=1, keepdim=True)
+    l2_norm = torch.sqrt(mean_squared + epsilon)
 
-    # Compute mean and standard deviation for prev_layer
-    prev_layer_mean = layer_activations.mean(
-        dim=1, keepdim=True)
-    prev_layer_std = layer_activations.std(
-        dim=1, keepdim=True)
-
-    # Apply standardization
-    prev_layer_stdized = (layer_activations - prev_layer_mean) / \
-        (prev_layer_std + epsilon)
-
-    return prev_layer_stdized
+    normalized_activations = layer_activations / l2_norm
+    return normalized_activations
 
 
-# input of dims (frames, batch size, input size)
 class TrainInputData:
+    """
+    input of dims (frames, batch size, input size)
+    """
+
     def __init__(self, pos_input, neg_input):
         self.pos_input = pos_input
         self.neg_input = neg_input
@@ -70,14 +65,6 @@ class Activations:
 
     def advance(self):
         self.previous = self.current
-
-
-class OutputLayer(nn.Module):
-    def __init__(self, prev_size, label_size) -> None:
-        super(OutputLayer, self).__init__()
-
-        self.backward_linear = nn.Linear(
-            label_size, prev_size)
 
 
 class ForwardMode(Enum):

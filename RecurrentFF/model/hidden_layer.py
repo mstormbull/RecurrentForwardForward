@@ -1,4 +1,4 @@
-import logging
+import math
 
 import torch
 from torch import nn
@@ -14,6 +14,18 @@ from RecurrentFF.util import (
 from RecurrentFF.settings import (
     Settings,
 )
+
+
+def amplified_initialization(layer: nn.Linear, amplification_factor=3.0):
+    """Amplified initialization for Linear layers."""
+    # Get the number of input features
+    n = layer.in_features
+    # Compute the standard deviation for He initialization
+    std = (2.0 / n) ** 0.5
+    # Amplify the standard deviation
+    amplified_std = std * amplification_factor
+    # Initialize weights with amplified standard deviation
+    nn.init.normal_(layer.weight, mean=0, std=amplified_std)
 
 
 class HiddenLayer(nn.Module):
@@ -49,6 +61,7 @@ class HiddenLayer(nn.Module):
             test_batch_size,
             prev_size,
             size,
+            next_size,
             damping_factor):
         super(HiddenLayer, self).__init__()
 
@@ -65,24 +78,19 @@ class HiddenLayer(nn.Module):
         self.reset_activations(True)
 
         self.forward_linear = nn.Linear(prev_size, size)
-        forward_mask = (torch.rand_like(self.forward_linear.weight) <
-                        self.settings.model.interconnect_density).float()
-        self.register_buffer('forward_mask', forward_mask)
-        self.forward_linear.weight.data.mul_(self.forward_mask)
-        self.forward_linear.weight.register_hook(
-            lambda grad: grad * self.forward_mask)
+        nn.init.kaiming_uniform_(
+            self.forward_linear.weight, nonlinearity='relu')
 
-        self.backward_linear = nn.Linear(size, prev_size)
-        backward_mask = (torch.rand_like(self.backward_linear.weight) <
-                         self.settings.model.interconnect_density).float()
-        self.register_buffer('backward_mask', backward_mask)
-        self.backward_linear.weight.data.mul_(self.backward_mask)
-        self.backward_linear.weight.register_hook(
-            lambda grad: grad * self.backward_mask)
+        self.backward_linear = nn.Linear(next_size, size)
+
+        if next_size == self.settings.data_config.num_classes:
+            amplified_initialization(self.backward_linear, 3.0)
+        else:
+            nn.init.uniform_(self.backward_linear.weight, -0.05, 0.05)
 
         # Initialize the lateral weights to be the identity matrix
         self.lateral_linear = nn.Linear(size, size)
-        nn.init.eye_(self.lateral_linear.weight)
+        nn.init.orthogonal_(self.lateral_linear.weight, gain=math.sqrt(2))
 
         self.previous_layer = None
         self.next_layer = None
@@ -228,7 +236,7 @@ class HiddenLayer(nn.Module):
         neg_badness = layer_activations_to_badness(neg_activations)
 
         # Loss function equivelent to:
-        # L = log(1 + exp(((-n + 2) + (p - 2))/2)
+        # plot3d log(1 + exp(-n + 1)) + log(1 + exp(p - 1)) for n=0 to 3, p=0 to 3
         layer_loss = F.softplus(torch.cat([
             (-1 * neg_badness) + self.settings.model.loss_threshold,
             pos_badness - self.settings.model.loss_threshold
@@ -236,8 +244,6 @@ class HiddenLayer(nn.Module):
         layer_loss.backward()
 
         self.optimizer.step()
-        self.optimizer.zero_grad()
-
         return layer_loss
 
     def forward(self, mode, data, labels, should_damp):
@@ -322,13 +328,13 @@ class HiddenLayer(nn.Module):
                 prev_act, self.settings.model.epsilon)
 
             new_activation =  \
-                F.elu(F.linear(
+                F.leaky_relu(F.linear(
                     prev_layer_stdized,
                     self.forward_linear.weight)) + \
-                -1 * F.elu(F.linear(
+                -1 * F.leaky_relu(F.linear(
                     next_layer_stdized,
-                    self.next_layer.backward_linear.weight)) + \
-                self.prelu(F.linear(
+                    self.backward_linear.weight)) + \
+                F.leaky_relu(F.linear(
                     prev_act_stdized,
                     self.lateral_linear.weight))
 
@@ -353,13 +359,13 @@ class HiddenLayer(nn.Module):
                 prev_act, self.settings.model.epsilon)
 
             new_activation = \
-                F.elu(F.linear(
+                F.leaky_relu(F.linear(
                     data,
                     self.forward_linear.weight)) + \
-                -1 * F.elu(F.linear(
+                -1 * F.leaky_relu(F.linear(
                     labels,
-                    self.next_layer.backward_linear.weight)) + \
-                self.prelu(F.linear(
+                    self.backward_linear.weight)) + \
+                F.leaky_relu(F.linear(
                     prev_act_stdized,
                     self.lateral_linear.weight))
 
@@ -391,13 +397,13 @@ class HiddenLayer(nn.Module):
                 prev_act, self.settings.model.epsilon)
 
             new_activation = \
-                F.elu(F.linear(
+                F.leaky_relu(F.linear(
                     data,
                     self.forward_linear.weight)) + \
-                -1 * F.elu(F.linear(
+                -1 * F.leaky_relu(F.linear(
                     next_layer_stdized,
-                    self.next_layer.backward_linear.weight)) + \
-                self.prelu(F.linear(
+                    self.backward_linear.weight)) + \
+                F.leaky_relu(F.linear(
                     prev_act_stdized,
                     self.lateral_linear.weight))
 
@@ -429,13 +435,13 @@ class HiddenLayer(nn.Module):
                 prev_act, self.settings.model.epsilon)
 
             new_activation = \
-                F.elu(F.linear(
+                F.leaky_relu(F.linear(
                     prev_layer_stdized,
                     self.forward_linear.weight)) + \
-                -1 * F.elu(F.linear(
+                -1 * F.leaky_relu(F.linear(
                     labels,
-                    self.next_layer.backward_linear.weight)) + \
-                self.prelu(F.linear(
+                    self.backward_linear.weight)) + \
+                F.leaky_relu(F.linear(
                     prev_act_stdized,
                     self.lateral_linear.weight))
 
