@@ -1,9 +1,11 @@
+import logging
 import math
 
 import torch
 from torch import nn
 from torch.nn import functional as F
-from torch.optim import RMSprop, Adam, Adadelta, SGD
+from torch.optim import RMSprop, Adam, Adadelta
+import wandb
 
 from RecurrentFF.util import (
     Activations,
@@ -26,6 +28,194 @@ def amplified_initialization(layer: nn.Linear, amplification_factor=3.0):
     amplified_std = std * amplification_factor
     # Initialize weights with amplified standard deviation
     nn.init.normal_(layer.weight, mean=0, std=amplified_std)
+
+
+class LayerMetrics:
+    def __init__(self, num_layers: int):
+        self.pos_activations_norms = [0 for _ in range(0, num_layers)]
+        self.neg_activations_norms = [0 for _ in range(0, num_layers)]
+        self.forward_weights_norms = [0 for _ in range(0, num_layers)]
+        self.forward_grads_norms = [0 for _ in range(0, num_layers)]
+        self.backward_weights_norms = [0 for _ in range(0, num_layers)]
+        self.backward_grads_norms = [0 for _ in range(0, num_layers)]
+        self.lateral_weights_norms = [0 for _ in range(0, num_layers)]
+        self.lateral_grads_norms = [0 for _ in range(0, num_layers)]
+        self.losses_per_layer = [0 for _ in range(0, num_layers)]
+
+        self.num_data_points = 0
+
+        self.update_norms = {}
+        self.momentum_norms = {}
+        self.update_angles = {}
+
+    def ingest_optimizer_metrics(self, layer_num: int, forward_mode: ForwardMode, layer):
+        forward_mode = str(forward_mode)
+
+        for group in layer.optimizer.param_groups:
+            for param in group['params']:
+                if param.grad is not None:
+                    # compute update norm
+                    update = -group['lr'] * param.grad
+                    update_norm = torch.norm(update, p=2)
+                    param_name = layer.param_name_dict[param]
+
+                    if layer_num not in self.update_norms:
+                        self.update_norms[layer_num] = {}
+                    if forward_mode not in self.update_norms[layer_num]:
+                        self.update_norms[layer_num][forward_mode] = {}
+                    if param_name not in self.update_norms[layer_num]:
+                        self.update_norms[layer_num][forward_mode][param_name] = 0
+
+                    self.update_norms[layer_num][forward_mode][param_name] += update_norm
+
+                    # compute momentum norm
+                    try:
+                        momentum_norm = torch.norm(
+                            layer.optimizer.state[param]['momentum_buffer'])
+                        if layer_num not in self.momentum_norms:
+                            self.momentum_norms[layer_num] = {}
+                        if forward_mode not in self.momentum_norms[layer_num]:
+                            self.momentum_norms[layer_num][forward_mode] = {}
+                        if param_name not in self.momentum_norms[layer_num]:
+                            self.momentum_norms[layer_num][forward_mode][param_name] = 0
+
+                        self.momentum_norms[layer_num][forward_mode][param_name] += momentum_norm
+                    except (KeyError, AttributeError):
+                        logging.debug(
+                            "No momentum buffer for param. Assume using non-momentum optimizer.")
+
+                    # compute angle
+                    cosine_similarity = torch.nn.functional.cosine_similarity(
+                        param.grad.view(-1), update.view(-1), dim=0)
+                    cosine_similarity = torch.clamp(cosine_similarity, -1, 1)
+                    angle_in_degrees = torch.acos(
+                        cosine_similarity) * (180 / math.pi)
+                    if layer_num not in self.update_angles:
+                        self.update_angles[layer_num] = {}
+                    if forward_mode not in self.update_angles[layer_num]:
+                        self.update_angles[layer_num][forward_mode] = {}
+                    if param_name not in self.update_angles[layer_num]:
+                        self.update_angles[layer_num][forward_mode][param_name] = 0
+
+                    self.update_angles[layer_num][forward_mode][param_name] += angle_in_degrees
+
+    def ingest_layer_metrics(self, layer_num: int, layer, loss: int):
+        pos_activations_norm = torch.norm(layer.pos_activations.current, p=2)
+        neg_activations_norm = torch.norm(layer.neg_activations.current, p=2)
+        forward_weights_norm = torch.norm(layer.forward_linear.weight, p=2)
+        backward_weights_norm = torch.norm(layer.backward_linear.weight, p=2)
+        lateral_weights_norm = torch.norm(layer.lateral_linear.weight, p=2)
+
+        forward_grad_norm = torch.norm(layer.forward_linear.weight.grad, p=2)
+        backward_grads_norm = torch.norm(
+            layer.backward_linear.weight.grad, p=2)
+        lateral_grads_norm = torch.norm(layer.lateral_linear.weight.grad, p=2)
+
+        self.pos_activations_norms[layer_num] += pos_activations_norm
+        self.neg_activations_norms[layer_num] += neg_activations_norm
+        self.forward_weights_norms[layer_num] += forward_weights_norm
+        self.forward_grads_norms[layer_num] += forward_grad_norm
+        self.backward_weights_norms[layer_num] += backward_weights_norm
+        self.backward_grads_norms[layer_num] += backward_grads_norm
+        self.lateral_weights_norms[layer_num] += lateral_weights_norm
+        self.lateral_grads_norms[layer_num] += lateral_grads_norm
+        self.losses_per_layer[layer_num] += loss
+
+    def increment_samples_seen(self):
+        self.num_data_points += 1
+
+    def average_layer_loss(self):
+        return sum(self.losses_per_layer) / self.num_data_points
+
+    def log_metrics(self, epoch):
+        for i in range(0, len(self.pos_activations_norms)):
+            layer_num = i+1
+
+            metric_name = "pos_activations_norms (layer " + \
+                str(layer_num) + ")"
+            wandb.log(
+                {metric_name: self.pos_activations_norms[i] / self.num_data_points}, step=epoch)
+
+            metric_name = "neg_activations_norms (layer " + \
+                str(layer_num) + ")"
+            wandb.log(
+                {metric_name: self.neg_activations_norms[i] / self.num_data_points}, step=epoch)
+
+            metric_name = "forward_weights_norms (layer " + \
+                str(layer_num) + ")"
+            wandb.log(
+                {metric_name: self.forward_weights_norms[i] / self.num_data_points}, step=epoch)
+
+            metric_name = "forward_grad_norms (layer " + str(layer_num) + ")"
+            wandb.log(
+                {metric_name: self.forward_grads_norms[i] / self.num_data_points}, step=epoch)
+
+            metric_name = "backward_weights_norms (layer " + \
+                str(layer_num) + ")"
+            wandb.log(
+                {metric_name: self.backward_weights_norms[i] / self.num_data_points}, step=epoch)
+
+            metric_name = "backward_grad_norms (layer " + str(layer_num) + ")"
+            wandb.log(
+                {metric_name: self.backward_grads_norms[i] / self.num_data_points}, step=epoch)
+
+            metric_name = "lateral_weights_norms (layer " + \
+                str(layer_num) + ")"
+            wandb.log(
+                {metric_name: self.lateral_weights_norms[i] / self.num_data_points}, step=epoch)
+
+            metric_name = "lateral_grad_norms (layer " + str(layer_num) + ")"
+            wandb.log(
+                {metric_name: self.lateral_grads_norms[i] / self.num_data_points}, step=epoch)
+
+            metric_name = "loss (layer " + str(layer_num) + ")"
+            wandb.log(
+                {metric_name: self.losses_per_layer[i] / self.num_data_points}, step=epoch)
+
+        for layer in self.update_norms:
+            layer_display = str(layer + 1)
+
+            for forward_mode in self.update_norms[layer]:
+                forward_mode_display = self.__forward_mode_display(
+                    forward_mode)
+
+                for param_name in self.update_norms[layer][forward_mode]:
+                    metric_name = f"{forward_mode_display} {param_name} update norm (layer {layer_display})"
+                    wandb.log(
+                        {metric_name: self.update_norms[layer][param_name] / self.num_data_points}, step=epoch)
+
+        for layer in self.momentum_norms:
+            layer_display = str(layer + 1)
+
+            for forward_mode in self.momentum_norms[layer]:
+                forward_mode_display = self.__forward_mode_display(
+                    forward_mode)
+
+                for param_name in self.momentum_norms[layer][forward_mode]:
+                    metric_name = f"{forward_mode_display} {param_name} momentum (layer {layer_display})"
+                    wandb.log(
+                        {metric_name: self.momentum_norms[layer][forward_mode][param_name] / self.num_data_points}, step=epoch)
+
+        for layer in self.update_angles:
+            layer_display = str(layer + 1)
+
+            for forward_mode in self.update_angles[layer]:
+                forward_mode_display = self.__forward_mode_display(
+                    forward_mode)
+
+                for param_name in self.update_angles[layer][forward_mode]:
+                    metric_name = f"{forward_mode_display} update angle (layer {layer_display})"
+                    wandb.log(
+                        {metric_name: self.update_angles[layer][forward_mode][param_name] / self.num_data_points}, step=epoch)
+
+    def __forward_mode_display(self, forward_mode: ForwardMode):
+        if str(ForwardMode.PositiveData) == forward_mode:
+            return "pos"
+        elif str(ForwardMode.NegativeData) == forward_mode:
+            return "neg"
+        else:
+            logging.error("Unexpected forward mode. Failing fast.")
+            exit(1)
 
 
 class HiddenLayer(nn.Module):
@@ -103,8 +293,6 @@ class HiddenLayer(nn.Module):
                 self.parameters(),
                 lr=self.settings.model.ff_rmsprop.learning_rate,
                 momentum=self.settings.model.ff_rmsprop.momentum)
-            # self.optimizer = SGD(
-            #     self.parameters(), lr=self.settings.model.ff_rmsprop.learning_rate)
         elif self.settings.model.ff_optimizer == "adadelta":
             self.optimizer = Adadelta(
                 self.parameters(),
@@ -205,7 +393,10 @@ class HiddenLayer(nn.Module):
     def set_next_layer(self, next_layer):
         self.next_layer = next_layer
 
-    def train(self, input_data, label_data, should_damp):
+    def train(self, input_data, label_data, should_damp, layer_metrics: LayerMetrics, layer_num: int):
+        # NOTE: Order of positive forward pass vs negative forward pass matters
+        # due to how we are calculating optimizer metrics. Do not reorder.
+
         self.optimizer.zero_grad()
 
         pos_activations = None
@@ -213,27 +404,52 @@ class HiddenLayer(nn.Module):
         if input_data is not None and label_data is not None:
             (pos_input, neg_input) = input_data
             (pos_labels, neg_labels) = label_data
-            pos_activations = self.forward(
-                ForwardMode.PositiveData, pos_input, pos_labels, should_damp)
+
             neg_activations = self.forward(
                 ForwardMode.NegativeData, neg_input, neg_labels, should_damp)
+            layer_metrics.ingest_optimizer_metrics(
+                layer_num, ForwardMode.NegativeData, self)
+
+            pos_activations = self.forward(
+                ForwardMode.PositiveData, pos_input, pos_labels, should_damp)
+            layer_metrics.ingest_optimizer_metrics(
+                layer_num, ForwardMode.PositiveData, self)
+
         elif input_data is not None:
             (pos_input, neg_input) = input_data
-            pos_activations = self.forward(
-                ForwardMode.PositiveData, pos_input, None, should_damp)
+
             neg_activations = self.forward(
                 ForwardMode.NegativeData, neg_input, None, should_damp)
+            layer_metrics.ingest_optimizer_metrics(
+                layer_num, ForwardMode.NegativeData, self)
+
+            pos_activations = self.forward(
+                ForwardMode.PositiveData, pos_input, None, should_damp)
+            layer_metrics.ingest_optimizer_metrics(
+                layer_num, ForwardMode.PositiveData, self)
+
         elif label_data is not None:
             (pos_labels, neg_labels) = label_data
-            pos_activations = self.forward(
-                ForwardMode.PositiveData, None, pos_labels, should_damp)
+
             neg_activations = self.forward(
                 ForwardMode.NegativeData, None, neg_labels, should_damp)
-        else:
+            layer_metrics.ingest_optimizer_metrics(
+                layer_num, ForwardMode.NegativeData, self)
+
             pos_activations = self.forward(
-                ForwardMode.PositiveData, None, None, should_damp)
+                ForwardMode.PositiveData, None, pos_labels, should_damp)
+            layer_metrics.ingest_optimizer_metrics(
+                layer_num, ForwardMode.PositiveData, self)
+        else:
             neg_activations = self.forward(
                 ForwardMode.NegativeData, None, None, should_damp)
+            layer_metrics.ingest_optimizer_metrics(
+                layer_num, ForwardMode.NegativeData, self)
+
+            pos_activations = self.forward(
+                ForwardMode.PositiveData, None, None, should_damp)
+            layer_metrics.ingest_optimizer_metrics(
+                layer_num, ForwardMode.PositiveData, self)
 
         pos_badness = layer_activations_to_badness(pos_activations)
         neg_badness = layer_activations_to_badness(neg_activations)

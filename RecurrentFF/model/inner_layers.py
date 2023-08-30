@@ -7,6 +7,7 @@ import torch
 import wandb
 
 from RecurrentFF.model.hidden_layer import HiddenLayer
+from RecurrentFF.util import ForwardMode
 
 
 class InnerLayers(nn.Module):
@@ -51,13 +52,17 @@ class InnerLayers(nn.Module):
             logging.debug("Training layer " + str(i))
             loss = None
             if i == 0 and len(self.layers) == 1:
-                loss = layer.train(input_data, label_data, should_damp)
+                loss = layer.train(input_data, label_data,
+                                   should_damp, layer_metrics, i)
             elif i == 0:
-                loss = layer.train(input_data, None, should_damp)
+                loss = layer.train(
+                    input_data, None, should_damp, layer_metrics, i)
             elif i == len(self.layers) - 1:
-                loss = layer.train(None, label_data, should_damp)
+                loss = layer.train(
+                    None, label_data, should_damp, layer_metrics, i)
             else:
-                loss = layer.train(None, None, should_damp)
+                loss = layer.train(None, None, should_damp,
+                                   layer_metrics, layer_num)
 
             layer_num = i+1
             logging.debug("Loss for layer " +
@@ -134,155 +139,3 @@ class InnerLayers(nn.Module):
 
     def __iter__(self):
         return (layer for layer in self.layers)
-
-
-class LayerMetrics:
-    def __init__(self, num_layers: int):
-        self.pos_activations_norms = [0 for _ in range(0, num_layers)]
-        self.neg_activations_norms = [0 for _ in range(0, num_layers)]
-        self.forward_weights_norms = [0 for _ in range(0, num_layers)]
-        self.forward_grads_norms = [0 for _ in range(0, num_layers)]
-        self.backward_weights_norms = [0 for _ in range(0, num_layers)]
-        self.backward_grads_norms = [0 for _ in range(0, num_layers)]
-        self.lateral_weights_norms = [0 for _ in range(0, num_layers)]
-        self.lateral_grads_norms = [0 for _ in range(0, num_layers)]
-        self.losses_per_layer = [0 for _ in range(0, num_layers)]
-
-        self.num_data_points = 0
-
-        self.update_norms = {}
-        self.momentum_norms = {}
-        self.update_angles = {}
-
-    def ingest_layer_metrics(self, layer_num: int, layer: HiddenLayer, loss: int):
-        pos_activations_norm = torch.norm(layer.pos_activations.current, p=2)
-        neg_activations_norm = torch.norm(layer.neg_activations.current, p=2)
-        forward_weights_norm = torch.norm(layer.forward_linear.weight, p=2)
-        backward_weights_norm = torch.norm(layer.backward_linear.weight, p=2)
-        lateral_weights_norm = torch.norm(layer.lateral_linear.weight, p=2)
-
-        forward_grad_norm = torch.norm(layer.forward_linear.weight.grad, p=2)
-        backward_grads_norm = torch.norm(
-            layer.backward_linear.weight.grad, p=2)
-        lateral_grads_norm = torch.norm(layer.lateral_linear.weight.grad, p=2)
-
-        self.pos_activations_norms[layer_num] += pos_activations_norm
-        self.neg_activations_norms[layer_num] += neg_activations_norm
-        self.forward_weights_norms[layer_num] += forward_weights_norm
-        self.forward_grads_norms[layer_num] += forward_grad_norm
-        self.backward_weights_norms[layer_num] += backward_weights_norm
-        self.backward_grads_norms[layer_num] += backward_grads_norm
-        self.lateral_weights_norms[layer_num] += lateral_weights_norm
-        self.lateral_grads_norms[layer_num] += lateral_grads_norm
-        self.losses_per_layer[layer_num] += loss
-
-        for group in layer.optimizer.param_groups:
-            for param in group['params']:
-                if param.grad is not None:
-                    # compute update norm
-                    update = -group['lr'] * param.grad
-                    update_norm = torch.norm(update, p=2)
-                    param_name = layer.param_name_dict[param]
-
-                    if layer_num not in self.update_norms:
-                        self.update_norms[layer_num] = {}
-                    if param_name not in self.update_norms[layer_num]:
-                        self.update_norms[layer_num][param_name] = 0
-
-                    self.update_norms[layer_num][param_name] += update_norm
-
-                    # compute momentum norm
-                    try:
-                        momentum_norm = torch.norm(
-                            layer.optimizer.state[param]['momentum_buffer'])
-                        if layer_num not in self.momentum_norms:
-                            self.momentum_norms[layer_num] = {}
-                        if param_name not in self.momentum_norms[layer_num]:
-                            self.momentum_norms[layer_num][param_name] = 0
-
-                        self.momentum_norms[layer_num][param_name] += momentum_norm
-                    except (KeyError, AttributeError):
-                        logging.debug(
-                            "No momentum buffer for param. Assume using non-momentum optimizer.")
-
-                    # compute angle
-                    cosine_similarity = torch.nn.functional.cosine_similarity(
-                        param.grad.view(-1), update.view(-1), dim=0)
-                    cosine_similarity = torch.clamp(cosine_similarity, -1, 1)
-                    angle_in_degrees = torch.acos(
-                        cosine_similarity) * (180 / math.pi)
-                    if layer_num not in self.update_angles:
-                        self.update_angles[layer_num] = {}
-                    if param_name not in self.update_angles[layer_num]:
-                        self.update_angles[layer_num][param_name] = 0
-
-                    self.update_angles[layer_num][param_name] += angle_in_degrees
-
-    def increment_samples_seen(self):
-        self.num_data_points += 1
-
-    def average_layer_loss(self):
-        return sum(self.losses_per_layer) / self.num_data_points
-
-    def log_metrics(self, epoch):
-        for i in range(0, len(self.pos_activations_norms)):
-            layer_num = i+1
-
-            metric_name = "pos_activations_norms (layer " + \
-                str(layer_num) + ")"
-            wandb.log(
-                {metric_name: self.pos_activations_norms[i] / self.num_data_points}, step=epoch)
-
-            metric_name = "neg_activations_norms (layer " + \
-                str(layer_num) + ")"
-            wandb.log(
-                {metric_name: self.neg_activations_norms[i] / self.num_data_points}, step=epoch)
-
-            metric_name = "forward_weights_norms (layer " + \
-                str(layer_num) + ")"
-            wandb.log(
-                {metric_name: self.forward_weights_norms[i] / self.num_data_points}, step=epoch)
-
-            metric_name = "forward_grad_norms (layer " + str(layer_num) + ")"
-            wandb.log(
-                {metric_name: self.forward_grads_norms[i] / self.num_data_points}, step=epoch)
-
-            metric_name = "backward_weights_norms (layer " + \
-                str(layer_num) + ")"
-            wandb.log(
-                {metric_name: self.backward_weights_norms[i] / self.num_data_points}, step=epoch)
-
-            metric_name = "backward_grad_norms (layer " + str(layer_num) + ")"
-            wandb.log(
-                {metric_name: self.backward_grads_norms[i] / self.num_data_points}, step=epoch)
-
-            metric_name = "lateral_weights_norms (layer " + \
-                str(layer_num) + ")"
-            wandb.log(
-                {metric_name: self.lateral_weights_norms[i] / self.num_data_points}, step=epoch)
-
-            metric_name = "lateral_grad_norms (layer " + str(layer_num) + ")"
-            wandb.log(
-                {metric_name: self.lateral_grads_norms[i] / self.num_data_points}, step=epoch)
-
-            metric_name = "loss (layer " + str(layer_num) + ")"
-            wandb.log(
-                {metric_name: self.losses_per_layer[i] / self.num_data_points}, step=epoch)
-
-        for _layer in self.update_norms:
-            for param_name in self.update_norms[_layer]:
-                metric_name = f"{param_name} update norm (layer {str(_layer)})"
-                wandb.log(
-                    {metric_name: self.update_norms[_layer][param_name] / self.num_data_points}, step=epoch)
-
-        for _layer in self.momentum_norms:
-            for param_name in self.momentum_norms[_layer]:
-                metric_name = f"{param_name} momentum (layer {str(_layer)})"
-                wandb.log(
-                    {metric_name: self.momentum_norms[_layer][param_name] / self.num_data_points}, step=epoch)
-
-        for _layer in self.update_angles:
-            for param_name in self.update_angles[_layer]:
-                metric_name = f"{param_name} update angle (layer {str(_layer)})"
-                wandb.log(
-                    {metric_name: self.update_angles[_layer][param_name] / self.num_data_points}, step=epoch)

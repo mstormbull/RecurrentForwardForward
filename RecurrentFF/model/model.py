@@ -9,8 +9,8 @@ from profilehooks import profile
 from RecurrentFF.model.data_scenario.static_single_class import (
     StaticSingleClassProcessor,
 )
-from RecurrentFF.model.hidden_layer import HiddenLayer
-from RecurrentFF.model.inner_layers import InnerLayers, LayerMetrics
+from RecurrentFF.model.hidden_layer import HiddenLayer, LayerMetrics
+from RecurrentFF.model.inner_layers import InnerLayers
 from RecurrentFF.util import (
     ForwardMode,
     LatentAverager,
