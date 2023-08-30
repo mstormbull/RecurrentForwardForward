@@ -51,9 +51,15 @@ class LayerMetrics:
     def ingest_optimizer_metrics(self, layer_num: int, forward_mode: ForwardMode, layer):
         forward_mode = str(forward_mode)
 
+        print("=======ingesting optimizer metrics")
+
         for group in layer.optimizer.param_groups:
             for param in group['params']:
+                if param.grad is None:
+                    print("----problem")
+
                 if param.grad is not None:
+                    print("---- not none")
                     # compute update norm
                     update = -group['lr'] * param.grad
                     update_norm = torch.norm(update, p=2)
@@ -66,6 +72,7 @@ class LayerMetrics:
                     if param_name not in self.update_norms[layer_num]:
                         self.update_norms[layer_num][forward_mode][param_name] = 0
 
+                    print("-------adding to update norms")
                     self.update_norms[layer_num][forward_mode][param_name] += update_norm
 
                     # compute momentum norm
@@ -172,14 +179,18 @@ class LayerMetrics:
             wandb.log(
                 {metric_name: self.losses_per_layer[i] / self.num_data_points}, step=epoch)
 
+        print(self.update_norms)
         for layer in self.update_norms:
             layer_display = str(layer + 1)
+            print("layer: " + str(layer))
 
             for forward_mode in self.update_norms[layer]:
+                print("forward mode: " + str(forward_mode))
                 forward_mode_display = self.__forward_mode_display(
                     forward_mode)
 
                 for param_name in self.update_norms[layer][forward_mode]:
+                    print("--------update went through")
                     metric_name = f"{forward_mode_display} {param_name} update norm (layer {layer_display})"
                     wandb.log(
                         {metric_name: self.update_norms[layer][param_name] / self.num_data_points}, step=epoch)
@@ -394,9 +405,6 @@ class HiddenLayer(nn.Module):
         self.next_layer = next_layer
 
     def train(self, input_data, label_data, should_damp, layer_metrics: LayerMetrics, layer_num: int):
-        # NOTE: Order of positive forward pass vs negative forward pass matters
-        # due to how we are calculating optimizer metrics. Do not reorder.
-
         self.optimizer.zero_grad()
 
         pos_activations = None
