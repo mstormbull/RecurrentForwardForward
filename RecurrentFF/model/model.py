@@ -132,6 +132,7 @@ class RecurrentFFNet(nn.Module):
             layer's activations into a 'badness' score. This function operates on the RecurrentFFNet model level
             and is called during the training process.
         """
+        total_batch_count = 0
         for epoch in range(0, self.settings.model.epochs):
             logging.info("Epoch: " + str(epoch))
 
@@ -141,10 +142,19 @@ class RecurrentFFNet(nn.Module):
 
                 if self.settings.model.should_replace_neg_data:
                     self.processor.replace_negative_data_inplace(
-                        input_data.pos_input, label_data, epoch)
+                        input_data.pos_input, label_data, total_batch_count)
 
                 layer_metrics, pos_badness_per_layer, neg_badness_per_layer = self.__train_batch(
-                    batch_num, input_data, label_data, epoch)
+                    batch_num, input_data, label_data, total_batch_count)
+
+                if self.settings.model.should_log_metrics:
+                    self.__log_batch_metrics(
+                        layer_metrics,
+                        pos_badness_per_layer,
+                        neg_badness_per_layer,
+                        total_batch_count)
+
+                total_batch_count += 1
 
             # TODO: make train batches equal to however much a single test batch is w.r.t. total samples
             train_accuracy = self.processor.brute_force_predict(
@@ -152,15 +162,15 @@ class RecurrentFFNet(nn.Module):
             test_accuracy = self.processor.brute_force_predict(
                 test_loader, 1, True)
 
-            self.__log_metrics(
-                train_accuracy,
-                test_accuracy,
-                layer_metrics,
-                pos_badness_per_layer,
-                neg_badness_per_layer,
-                epoch)
+            if self.settings.model.should_log_metrics:
+                self.__log_epoch_metrics(
+                    train_accuracy,
+                    test_accuracy,
+                    epoch,
+                    total_batch_count
+                )
 
-    def __train_batch(self, batch_num, input_data, label_data, epoch):
+    def __train_batch(self, batch_num, input_data, label_data, total_batch_count):
         logging.info("Batch: " + str(batch_num))
 
         self.inner_layers.reset_activations(True)
@@ -220,7 +230,7 @@ class RecurrentFFNet(nn.Module):
         if self.settings.model.should_replace_neg_data:
             pos_target_latents = pos_target_latents.retrieve()
             self.processor.train_class_predictor_from_latents(
-                pos_target_latents, label_data.pos_labels[0], epoch)
+                pos_target_latents, label_data.pos_labels[0], total_batch_count)
 
         pos_badness_per_layer = [
             sum(layer_badnesses) /
@@ -235,14 +245,17 @@ class RecurrentFFNet(nn.Module):
 
         return layer_metrics, pos_badness_per_layer, neg_badness_per_layer
 
-    def __log_metrics(
+    def __log_epoch_metrics(self, train_accuracy, test_accuracy, epoch, total_batch_count):
+        wandb.log({"train_acc": train_accuracy,
+                   "test_acc": test_accuracy,
+                   "epoch": epoch}, step=total_batch_count)
+
+    def __log_batch_metrics(
             self,
-            train_accuracy,
-            test_accuracy,
             layer_metrics: LayerMetrics,
             pos_badness_per_layer,
             neg_badness_per_layer,
-            epoch):
+            total_batch_count):
         # Supports wandb tracking of max 3 layer badnesses
         try:
             first_layer_pos_badness = pos_badness_per_layer[0]
@@ -255,37 +268,33 @@ class RecurrentFFNet(nn.Module):
             # No-op as there may not be 3 layers
             pass
 
-        layer_metrics.log_metrics(epoch)
+        layer_metrics.log_metrics(total_batch_count)
         average_layer_loss = layer_metrics.average_layer_loss()
 
         if len(self.inner_layers) >= 3:
-            wandb.log({"train_acc": train_accuracy,
-                       "test_acc": test_accuracy,
-                       "loss": average_layer_loss,
+            wandb.log({"loss": average_layer_loss,
                        "first_layer_pos_badness": first_layer_pos_badness,
                        "second_layer_pos_badness": second_layer_pos_badness,
                        "third_layer_pos_badness": third_layer_pos_badness,
                        "first_layer_neg_badness": first_layer_neg_badness,
                        "second_layer_neg_badness": second_layer_neg_badness,
                        "third_layer_neg_badness": third_layer_neg_badness,
-                       "epoch": epoch},
-                      step=epoch)
+                       "batch": total_batch_count},
+                      step=total_batch_count)
         elif len(self.inner_layers) == 2:
-            wandb.log({"train_acc": train_accuracy,
-                       "test_acc": test_accuracy,
-                       "loss": average_layer_loss,
-                       "first_layer_pos_badness": first_layer_pos_badness,
-                       "second_layer_pos_badness": second_layer_pos_badness,
-                       "first_layer_neg_badness": first_layer_neg_badness,
-                       "second_layer_neg_badness": second_layer_neg_badness,
-                       "epoch": epoch},
-                      step=epoch)
+            wandb.log({
+                "loss": average_layer_loss,
+                "first_layer_pos_badness": first_layer_pos_badness,
+                "second_layer_pos_badness": second_layer_pos_badness,
+                "first_layer_neg_badness": first_layer_neg_badness,
+                "second_layer_neg_badness": second_layer_neg_badness,
+                "batch": total_batch_count},
+                step=total_batch_count)
 
         elif len(self.inner_layers) == 1:
-            wandb.log({"train_acc": train_accuracy,
-                       "test_acc": test_accuracy,
-                       "loss": average_layer_loss,
-                       "first_layer_pos_badness": first_layer_pos_badness,
-                       "first_layer_neg_badness": first_layer_neg_badness,
-                       "epoch": epoch},
-                      step=epoch)
+            wandb.log({
+                "loss": average_layer_loss,
+                "first_layer_pos_badness": first_layer_pos_badness,
+                "first_layer_neg_badness": first_layer_neg_badness,
+                "batch": total_batch_count},
+                step=total_batch_count)
