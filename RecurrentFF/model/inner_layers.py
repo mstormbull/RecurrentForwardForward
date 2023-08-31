@@ -279,6 +279,7 @@ class LayerMetrics:
                     step=total_batch_count)
 
         for layer_index in self.momentum_norms:
+            layer_index_display = layer_index + 1
             for param_name in self.momentum_norms[layer_index]:
                 metric_name = f"{param_name} momentum (layer {str(layer_index_display)})"
                 wandb.log(
@@ -287,6 +288,7 @@ class LayerMetrics:
                     step=total_batch_count)
 
         for layer_index in self.update_angles:
+            layer_index_display = layer_index + 1
             for param_name in self.update_angles[layer_index]:
                 metric_name = f"{param_name} update angle (layer {str(layer_index_display)})"
                 wandb.log(
