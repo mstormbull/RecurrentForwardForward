@@ -2,6 +2,7 @@ import math
 
 import torch
 from torch import nn
+from torch.nn import Module
 from torch.nn import functional as F
 from torch.optim import RMSprop, Adam, Adadelta, SGD
 
@@ -14,6 +15,45 @@ from RecurrentFF.util import (
 from RecurrentFF.settings import (
     Settings,
 )
+
+
+def custom_load_state_dict(self, state_dict, strict=True):
+    # This function is a replication of the original PyTorch load_state_dict logic
+    # with a check to prevent infinite recursion through the linked layers.
+    def load(module, prefix=''):
+        local_metadata = {} if metadata is None else metadata.get(
+            prefix[:-1], {})
+        module._load_from_state_dict(
+            state_dict, prefix, local_metadata, True, missing_keys, unexpected_keys, error_msgs)
+        for name, child in module._modules.items():
+            # Check to prevent infinite recursion
+            if name not in ['previous_layer', 'next_layer']:
+                if child is not None:
+                    load(child, prefix + name + '.')
+
+    missing_keys = []
+    unexpected_keys = []
+    error_msgs = []
+
+    # The original function uses _IncompatibleKeys to track this, but for simplicity
+    # we'll just use two lists and construct it at the end if needed.
+
+    metadata = getattr(state_dict, '_metadata', None)
+    load(self)
+
+    if strict:
+        if len(unexpected_keys) > 0:
+            error_msgs.insert(0, 'Unexpected key(s) in state_dict: {}. '.format(
+                ', '.join('"{}"'.format(k) for k in unexpected_keys)))
+        if len(missing_keys) > 0:
+            error_msgs.insert(0, 'Missing key(s) in state_dict: {}. '.format(
+                ', '.join('"{}"'.format(k) for k in missing_keys)))
+
+    if len(error_msgs) > 0:
+        raise RuntimeError(
+            'Error(s) in loading state_dict:\n\t{}'.format('\n\t'.join(error_msgs)))
+
+    return self
 
 
 def amplified_initialization(layer: nn.Linear, amplification_factor=3.0):
@@ -53,6 +93,8 @@ class HiddenLayer(nn.Module):
     backward transformation is key in the learning process where it aids in the
     adjustment of weights based on the output or next layer's activations.
     """
+
+    setattr(Module, "load_state_dict", custom_load_state_dict)
 
     def __init__(
             self,
@@ -103,8 +145,6 @@ class HiddenLayer(nn.Module):
                 self.parameters(),
                 lr=self.settings.model.ff_rmsprop.learning_rate,
                 momentum=self.settings.model.ff_rmsprop.momentum)
-            # self.optimizer = SGD(
-            #     self.parameters(), lr=self.settings.model.ff_rmsprop.learning_rate)
         elif self.settings.model.ff_optimizer == "adadelta":
             self.optimizer = Adadelta(
                 self.parameters(),
@@ -120,6 +160,12 @@ class HiddenLayer(nn.Module):
         collection in the higher-level RecurrentFFNet. They will all get the
         apply call from there.
         """
+        # Remove `previous_layer` and `next_layer` temporarily
+        previous_layer = self.previous_layer
+        next_layer = self.next_layer
+        self.previous_layer = None
+        self.next_layer = None
+
         # Apply `fn` to each parameter and buffer of this layer
         for param in self._parameters.values():
             if param is not None:
@@ -133,12 +179,6 @@ class HiddenLayer(nn.Module):
             if buf is not None:
                 self._buffers[key] = fn(buf)
 
-        # Then remove `previous_layer` and `next_layer` temporarily
-        previous_layer = self.previous_layer
-        next_layer = self.next_layer
-        self.previous_layer = None
-        self.next_layer = None
-
         # Apply `fn` to submodules
         for module in self.children():
             module._apply(fn)
@@ -148,6 +188,22 @@ class HiddenLayer(nn.Module):
         self.next_layer = next_layer
 
         return self
+
+    def state_dict(self, *args, **kwargs):
+        # Temporarily unlink the previous and next layers
+        previous_layer = self.previous_layer
+        next_layer = self.next_layer
+        self.previous_layer = None
+        self.next_layer = None
+
+        # Get the state dict without the linked layers
+        state = super().state_dict(*args, **kwargs)
+
+        # Restore the links
+        self.previous_layer = previous_layer
+        self.next_layer = next_layer
+
+        return state
 
     def reset_activations(self, isTraining):
         activations_dim = None
@@ -293,11 +349,14 @@ class HiddenLayer(nn.Module):
             damping, update the current layer's activations, and return the new
             activations.
         """
+        next_layer = self.next_layer
+        previous_layer = self.previous_layer
+
         # Make sure assumptions aren't violated regarding layer connectivity.
         if data is None:
-            assert self.previous_layer is not None
+            assert previous_layer is not None
         if labels is None:
-            assert self.next_layer is not None
+            assert next_layer is not None
 
         # Middle layer.
         new_activation = None
@@ -306,16 +365,16 @@ class HiddenLayer(nn.Module):
             prev_layer_prev_timestep_activations = None
             prev_act = None
             if mode == ForwardMode.PositiveData:
-                next_layer_prev_timestep_activations = self.next_layer.pos_activations.previous
-                prev_layer_prev_timestep_activations = self.previous_layer.pos_activations.previous
+                next_layer_prev_timestep_activations = next_layer.pos_activations.previous
+                prev_layer_prev_timestep_activations = previous_layer.pos_activations.previous
                 prev_act = self.pos_activations.previous
             elif mode == ForwardMode.NegativeData:
-                next_layer_prev_timestep_activations = self.next_layer.neg_activations.previous
-                prev_layer_prev_timestep_activations = self.previous_layer.neg_activations.previous
+                next_layer_prev_timestep_activations = next_layer.neg_activations.previous
+                prev_layer_prev_timestep_activations = previous_layer.neg_activations.previous
                 prev_act = self.neg_activations.previous
             elif mode == ForwardMode.PredictData:
-                next_layer_prev_timestep_activations = self.next_layer.predict_activations.previous
-                prev_layer_prev_timestep_activations = self.previous_layer.predict_activations.previous
+                next_layer_prev_timestep_activations = next_layer.predict_activations.previous
+                prev_layer_prev_timestep_activations = previous_layer.predict_activations.previous
                 prev_act = self.predict_activations.previous
 
             prev_layer_prev_timestep_activations = prev_layer_prev_timestep_activations.detach()
@@ -382,13 +441,13 @@ class HiddenLayer(nn.Module):
             prev_act = None
             next_layer_prev_timestep_activations = None
             if mode == ForwardMode.PositiveData:
-                next_layer_prev_timestep_activations = self.next_layer.pos_activations.previous
+                next_layer_prev_timestep_activations = next_layer.pos_activations.previous
                 prev_act = self.pos_activations.previous
             elif mode == ForwardMode.NegativeData:
-                next_layer_prev_timestep_activations = self.next_layer.neg_activations.previous
+                next_layer_prev_timestep_activations = next_layer.neg_activations.previous
                 prev_act = self.neg_activations.previous
             elif mode == ForwardMode.PredictData:
-                next_layer_prev_timestep_activations = self.next_layer.predict_activations.previous
+                next_layer_prev_timestep_activations = next_layer.predict_activations.previous
                 prev_act = self.predict_activations.previous
 
             next_layer_prev_timestep_activations = next_layer_prev_timestep_activations.detach()
@@ -420,13 +479,13 @@ class HiddenLayer(nn.Module):
             prev_layer_prev_timestep_activations = None
             prev_act = None
             if mode == ForwardMode.PositiveData:
-                prev_layer_prev_timestep_activations = self.previous_layer.pos_activations.previous
+                prev_layer_prev_timestep_activations = previous_layer.pos_activations.previous
                 prev_act = self.pos_activations.previous
             elif mode == ForwardMode.NegativeData:
-                prev_layer_prev_timestep_activations = self.previous_layer.neg_activations.previous
+                prev_layer_prev_timestep_activations = previous_layer.neg_activations.previous
                 prev_act = self.neg_activations.previous
             elif mode == ForwardMode.PredictData:
-                prev_layer_prev_timestep_activations = self.previous_layer.predict_activations.previous
+                prev_layer_prev_timestep_activations = previous_layer.predict_activations.previous
                 prev_act = self.predict_activations.previous
 
             prev_layer_prev_timestep_activations = prev_layer_prev_timestep_activations.detach()

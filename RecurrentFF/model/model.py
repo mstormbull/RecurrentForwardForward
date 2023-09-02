@@ -5,6 +5,7 @@ import torch
 from torch import nn
 import wandb
 from profilehooks import profile
+from RecurrentFF.model.data_scenario.processor import DataScenario
 
 from RecurrentFF.model.data_scenario.static_single_class import (
     StaticSingleClassProcessor,
@@ -12,6 +13,7 @@ from RecurrentFF.model.data_scenario.static_single_class import (
 from RecurrentFF.model.hidden_layer import HiddenLayer
 from RecurrentFF.model.inner_layers import InnerLayers, LayerMetrics
 from RecurrentFF.util import (
+    WEIGHTS_PATH,
     ForwardMode,
     LatentAverager,
     ValidationLoader,
@@ -22,18 +24,11 @@ from RecurrentFF.settings import (
 )
 
 
-# TODO: store activations
-# TODO: add conv layer at beginning to use receptive fields
 # TODO: try sigmoid activation function
-# TODO: use separate optimizer for lateral connections
-# TODO: plumb optimizer into `HiddenLayer`
-# TODO: different learning rates for lateral connections
-# TODO: initialize weights (division by n, number of inputs) (lora activation)
-# TODO: threshold a parameter?
-# TODO: average activation
-# TODO: look at Hinton norm
-# TODO: log activations (variance is much bigger than average, then relu
-#       is not good - maybe try leaky relu?)
+# TODO: try use separate optimizer for lateral connections
+# TODO: try different learning rates for lateral connections
+# TODO: figure out average activation
+# TODO: log activations (variance is much bigger than average, then not good)
 class RecurrentFFNet(nn.Module):
     """
     Implements a Recurrent Forward-Forward Network (RecurrentFFNet) based on
@@ -103,6 +98,11 @@ class RecurrentFFNet(nn.Module):
 
         logging.info("Finished initializing network")
 
+    def predict(self, data_scenario: DataScenario, data_loader, num_batches: int, write_activations=False):
+        if data_scenario == DataScenario.StaticSingleClass:
+            self.processor.brute_force_predict(
+                data_loader, num_batches, is_test_set=True, write_activations=write_activations)
+
     @profile(stdout=False, filename='baseline.prof',
              skip=Settings.new().model.skip_profiling)
     def train(self, train_loader, test_loader):
@@ -133,6 +133,7 @@ class RecurrentFFNet(nn.Module):
             and is called during the training process.
         """
         total_batch_count = 0
+        best_test_accuracy = 0
         for epoch in range(0, self.settings.model.epochs):
             logging.info("Epoch: " + str(epoch))
 
@@ -161,6 +162,10 @@ class RecurrentFFNet(nn.Module):
                 ValidationLoader(train_loader), 10, False)
             test_accuracy = self.processor.brute_force_predict(
                 test_loader, 1, True)
+
+            if test_accuracy > best_test_accuracy:
+                best_test_accuracy = test_accuracy
+                torch.save(self.state_dict(), WEIGHTS_PATH)
 
             if self.settings.model.should_log_metrics:
                 self.__log_epoch_metrics(
