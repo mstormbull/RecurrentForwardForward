@@ -515,9 +515,12 @@ class HiddenLayer(nn.Module):
 
         if mode == ForwardMode.PositiveData:
             self.pos_activations.current = new_activation
+            self.pos_activations.previous = new_activation
         elif mode == ForwardMode.NegativeData:
             self.neg_activations.current = new_activation
+            self.neg_activations.previous = new_activation
         elif mode == ForwardMode.PredictData:
             self.predict_activations.current = new_activation
+            self.predict_activations.previous = new_activation
 
         return new_activation
