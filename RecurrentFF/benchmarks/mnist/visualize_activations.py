@@ -109,6 +109,8 @@ def plot_activations_over_timesteps():
                 if max_from_timestep > global_max:
                     global_max = max_from_timestep
 
+        global_max = global_max // 4
+
         for scenario in scenarios:
             print(f"---------Scenario: {scenario}---------")
 
