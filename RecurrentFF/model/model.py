@@ -65,7 +65,7 @@ class RecurrentFFNet(nn.Module):
 
         self.settings = settings
 
-        convolution_in_channels = 1
+        convolution_in_channels = 3
         convolution_kernel_size = 3
         convolution_padding = 1
         convolution_stride = 1
@@ -81,8 +81,8 @@ class RecurrentFFNet(nn.Module):
             nn.MaxPool2d(kernel_size=max_pool_kernel_size,
                          stride=max_pool_stride)
         )
-        for param in conv_layers.parameters():
-            param.requires_grad = False
+        # for param in conv_layers.parameters():
+        #     param.requires_grad = False
 
         fully_connected_layers = nn.ModuleList()
         prev_size = conv_output_size

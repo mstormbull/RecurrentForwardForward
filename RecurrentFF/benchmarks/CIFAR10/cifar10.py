@@ -9,7 +9,7 @@ from RecurrentFF.util import WEIGHTS_PATH, TrainInputData, TrainLabelData, set_l
 from RecurrentFF.model.model import RecurrentFFNet
 from RecurrentFF.settings import Settings, DataConfig
 
-DATA_SIZE = 3072
+DATA_SIZE = 1024
 NUM_CLASSES = 10
 TRAIN_BATCH_SIZE = 500
 TEST_BATCH_SIZE = 5000
@@ -115,8 +115,8 @@ def train_collate_fn(batch):
     negative_labels = torch.stack(negative_labels)
 
     # 4. Repeat along a new dimension for ITERATIONS times
-    data1 = data1.unsqueeze(0).repeat(ITERATIONS, 1, 1)
-    data2 = data2.unsqueeze(0).repeat(ITERATIONS, 1, 1)
+    data1 = data1.unsqueeze(0).repeat(ITERATIONS, 1, 1, 1, 1)
+    data2 = data2.unsqueeze(0).repeat(ITERATIONS, 1, 1, 1, 1)
     positive_labels = positive_labels.unsqueeze(0).repeat(ITERATIONS, 1, 1)
     negative_labels = negative_labels.unsqueeze(0).repeat(ITERATIONS, 1, 1)
 
@@ -145,7 +145,7 @@ def test_collate_fn(batch):
     labels = torch.stack(labels)
 
     # 3. Repeat along a new dimension for ITERATIONS times
-    data = data.unsqueeze(0).repeat(ITERATIONS, 1, 1)
+    data = data.unsqueeze(0).repeat(ITERATIONS, 1, 1, 1, 1)
     labels = labels.unsqueeze(0).repeat(ITERATIONS, 1)
 
     # 4. Return as a custom object
@@ -157,7 +157,7 @@ def CIFAR10_loaders(train_batch_size, test_batch_size):
         ToTensor(),
         Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
         # IMPORTANT: This needs to change if using CNN
-        Lambda(lambda x: x.view(-1))  # Flatten the tensor
+        # Lambda(lambda x: x.view(-1))  # Flatten the tensor
     ])
 
     # transform_cifar10_augmented = Compose([
@@ -228,7 +228,7 @@ if __name__ == "__main__":
         # track hyperparameters and run metadata
         config={
             "architecture": "Recurrent-FF",
-            "dataset": "MNIST",
+            "dataset": "CIFAR10",
             "settings": settings.model_dump(),
         }
     )
