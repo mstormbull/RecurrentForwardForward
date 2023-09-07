@@ -3,21 +3,25 @@ import math
 
 
 from torch import nn
+from torch.optim import RMSprop
 import torch
 import wandb
 
 from RecurrentFF.model.hidden_layer import HiddenLayer
+from RecurrentFF.settings import Settings
 
 
 class InnerLayers(nn.Module):
 
-    def __init__(self, settings, ff_layers, conv_layers):
+    def __init__(self, settings: Settings, ff_layers, conv_layers):
         super(InnerLayers, self).__init__()
 
         self.settings = settings
 
         self.ff_layers = ff_layers
         self.conv_layers = conv_layers
+        self.optimizer = RMSprop(
+            self.conv_layers.parameters(), lr=settings.model.ff_rmsprop.learning_rate, momentum=settings.model.ff_rmsprop.momentum)
 
     def _process_convolutional_layers_single_input(self, input_data):
         post_conv_input = self.conv_layers.forward(input_data)
@@ -90,6 +94,8 @@ class InnerLayers(nn.Module):
                           str(layer_num) + ": " + str(loss))
 
             layer_metrics.ingest_layer_metrics(i, layer, loss)
+
+        self.optimizer.step()
 
         layer_metrics.increment_samples_seen()
 
