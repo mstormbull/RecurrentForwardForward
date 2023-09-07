@@ -76,6 +76,8 @@ class InnerLayers(nn.Module):
             calling the 'advance_stored_activations' method.
         """
 
+        self.optimizer.zero_grad()
+
         input_data = self._process_convolutional_layers_multi_input(input_data)
         for i, layer in enumerate(self.ff_layers):
             logging.debug("Training layer " + str(i))
