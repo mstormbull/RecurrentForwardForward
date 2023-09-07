@@ -13,3 +13,4 @@ logs.txt
 sequences
 *.pth
 *.pt
+cifar-data/
