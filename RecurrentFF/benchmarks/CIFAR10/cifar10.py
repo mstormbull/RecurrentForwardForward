@@ -152,7 +152,7 @@ def test_collate_fn(batch):
     return SingleStaticClassTestData(data, labels)
 
 
-def MNIST_loaders(train_batch_size, test_batch_size):
+def CIFAR10_loaders(train_batch_size, test_batch_size):
     transform_cifar10 = Compose([
         ToTensor(),
         Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
@@ -181,7 +181,7 @@ def MNIST_loaders(train_batch_size, test_batch_size):
 
     test_loader = DataLoader(
         CustomTestDataset(
-            MNIST(
+            CIFAR10(
                 './data/',
                 train=False,
                 download=True,
@@ -234,7 +234,7 @@ if __name__ == "__main__":
     )
 
     # Generate train data.
-    train_loader, test_loader = MNIST_loaders(
+    train_loader, test_loader = CIFAR10_loaders(
         settings.data_config.train_batch_size, settings.data_config.test_batch_size)
 
     # Create and run model.
