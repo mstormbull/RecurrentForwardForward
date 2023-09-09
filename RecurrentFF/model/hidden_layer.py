@@ -129,25 +129,35 @@ class HiddenLayer(nn.Module):
         self.predict_activations = None
         self.reset_activations(True)
 
+        # self.forward_linear = nn.Linear(prev_size, size)
+        # nn.init.kaiming_uniform_(
+        #     self.forward_linear.weight, nonlinearity='relu')
+
+        # self.backward_linear = nn.Linear(next_size, size)
+
+        # if next_size == self.settings.data_config.num_classes:
+        #     amplified_initialization(self.backward_linear, 3.0)
+        # else:
+        #     nn.init.uniform_(self.backward_linear.weight, -0.05, 0.05)
+
+        # # Initialize the lateral weights to be the identity matrix
+        # self.lateral_linear = nn.Linear(size, size)
+        # # Initialize the lateral weights to be the identity matrix
+        # nn.init.eye_(self.lateral_linear.weight)
+        # self.lateral_linear.weight.register_hook(
+        #     create_enforce_diagonal_grad_hook(self.settings))
+        # self.lateral_linear.bias.data.zero_()
+        # # nn.init.orthogonal_(self.lateral_linear.weight, gain=math.sqrt(2))
+
         self.forward_linear = nn.Linear(prev_size, size)
-        nn.init.kaiming_uniform_(
-            self.forward_linear.weight, nonlinearity='relu')
-
-        self.backward_linear = nn.Linear(next_size, size)
-
-        if next_size == self.settings.data_config.num_classes:
-            amplified_initialization(self.backward_linear, 3.0)
-        else:
-            nn.init.uniform_(self.backward_linear.weight, -0.05, 0.05)
-
-        # Initialize the lateral weights to be the identity matrix
+        self.backward_linear = nn.Linear(size, prev_size)
         self.lateral_linear = nn.Linear(size, size)
+
         # Initialize the lateral weights to be the identity matrix
         nn.init.eye_(self.lateral_linear.weight)
         self.lateral_linear.weight.register_hook(
             create_enforce_diagonal_grad_hook(self.settings))
         self.lateral_linear.bias.data.zero_()
-        # nn.init.orthogonal_(self.lateral_linear.weight, gain=math.sqrt(2))
 
         self.previous_layer = None
         self.next_layer = None
@@ -404,16 +414,17 @@ class HiddenLayer(nn.Module):
             prev_act_stdized = standardize_layer_activations(
                 prev_act, self.settings.model.epsilon)
 
-            new_activation = F.leaky_relu(
-                F.linear(
-                    prev_layer_stdized,
-                    self.forward_linear.weight) +
-                -1 * F.linear(
-                    next_layer_stdized,
-                    self.backward_linear.weight) +
-                F.linear(
-                    prev_act_stdized,
-                    self.lateral_linear.weight))
+            forward = F.leaky_relu(F.linear(
+                prev_layer_stdized,
+                self.forward_linear.weight))
+            backward = -1 * F.leaky_relu(F.linear(
+                next_layer_stdized,
+                self.backward_linear.weight))
+            lateral = F.leaky_relu(F.linear(
+                prev_act_stdized,
+                self.lateral_linear.weight))
+
+            new_activation = forward + backward + lateral
 
             if should_damp:
                 old_activation = new_activation
@@ -435,16 +446,18 @@ class HiddenLayer(nn.Module):
             prev_act_stdized = standardize_layer_activations(
                 prev_act, self.settings.model.epsilon)
 
-            new_activation = F.leaky_relu(
+            forward = F.leaky_relu(
                 F.linear(
                     data,
-                    self.forward_linear.weight) +
-                -1 * F.linear(
-                    labels,
-                    self.backward_linear.weight) +
-                F.linear(
-                    prev_act_stdized,
-                    self.lateral_linear.weight))
+                    self.forward_linear.weight))
+            backward = -1 * F.leaky_relu(F.linear(
+                labels,
+                self.backward_linear.weight))
+            lateral = F.leaky_relu(F.linear(
+                prev_act_stdized,
+                self.lateral_linear.weight))
+
+            new_activation = forward + backward + lateral
 
             if should_damp:
                 old_activation = new_activation
@@ -473,16 +486,18 @@ class HiddenLayer(nn.Module):
             prev_act_stdized = standardize_layer_activations(
                 prev_act, self.settings.model.epsilon)
 
-            new_activation = F.leaky_relu(
+            forward = F.leaky_relu(
                 F.linear(
                     data,
-                    self.forward_linear.weight) +
-                -1 * F.linear(
-                    next_layer_stdized,
-                    self.backward_linear.weight) +
-                F.linear(
-                    prev_act_stdized,
-                    self.lateral_linear.weight))
+                    self.forward_linear.weight))
+            backward = -1 * F.leaky_relu(F.linear(
+                next_layer_stdized,
+                self.backward_linear.weight))
+            lateral = F.leaky_relu(F.linear(
+                prev_act_stdized,
+                self.lateral_linear.weight))
+
+            new_activation = forward + backward + lateral
 
             if should_damp:
                 old_activation = new_activation
@@ -511,17 +526,18 @@ class HiddenLayer(nn.Module):
             prev_act_stdized = standardize_layer_activations(
                 prev_act, self.settings.model.epsilon)
 
-            new_activation = \
-                F.leaky_relu(
-                    F.linear(
-                        prev_layer_stdized,
-                        self.forward_linear.weight) +
-                    -1 * F.linear(
-                        labels,
-                        self.backward_linear.weight) +
-                    F.linear(
-                        prev_act_stdized,
-                        self.lateral_linear.weight))
+            forward = F.leaky_relu(
+                F.linear(
+                    prev_layer_stdized,
+                    self.forward_linear.weight))
+            backward = -1 * F.leaky_relu(F.linear(
+                labels,
+                self.backward_linear.weight))
+            lateral = F.leaky_relu(F.linear(
+                prev_act_stdized,
+                self.lateral_linear.weight))
+
+            new_activation = forward + backward + lateral
 
             if should_damp:
                 old_activation = new_activation
