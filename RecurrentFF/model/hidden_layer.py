@@ -150,7 +150,7 @@ class HiddenLayer(nn.Module):
         # # nn.init.orthogonal_(self.lateral_linear.weight, gain=math.sqrt(2))
 
         self.forward_linear = nn.Linear(prev_size, size)
-        self.backward_linear = nn.Linear(size, prev_size)
+        self.backward_linear = nn.Linear(next_size, size)
         self.lateral_linear = nn.Linear(size, size)
 
         # Initialize the lateral weights to be the identity matrix
