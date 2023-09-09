@@ -17,6 +17,7 @@ class DataConfig(BaseModel):
     train_batch_size: int
     test_batch_size: int
     iterations: int
+    dataset: str
 
 
 class FfRmsprop(BaseModel):
@@ -48,6 +49,7 @@ class ClassifierAdadelta(BaseModel):
 class Model(BaseModel):
     hidden_sizes: list
     epochs: int
+    prelabel_timesteps: int
     loss_threshold: float
     damping_factor: float
     epsilon: float

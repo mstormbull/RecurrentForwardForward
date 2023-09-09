@@ -3,8 +3,6 @@ import logging
 
 import torch
 
-WEIGHTS_PATH = "weights.pth"
-
 
 # # NOTE: Square images only
 # def calculate_conv_output_dimensions(data_size,

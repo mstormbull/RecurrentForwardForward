@@ -15,6 +15,7 @@ NUM_CLASSES = 10
 TRAIN_BATCH_SIZE = 500
 TEST_BATCH_SIZE = 10000
 ITERATIONS = 20
+DATASET = "Moving-MNIST"
 
 DATA_PER_FILE = 1000
 
@@ -202,6 +203,7 @@ if __name__ == '__main__':
         "train_batch_size": TRAIN_BATCH_SIZE,
         "test_batch_size": TEST_BATCH_SIZE,
         "iterations": ITERATIONS,
+        "dataset": DATASET,
     }
 
     if settings.data_config is None:
@@ -220,7 +222,7 @@ if __name__ == '__main__':
         # track hyperparameters and run metadata
         config={
             "architecture": "Recurrent-FF",
-            "dataset": "Moving-MNIST",
+            "dataset": DATASET,
             "settings": settings.model_dump(),
         }
     )

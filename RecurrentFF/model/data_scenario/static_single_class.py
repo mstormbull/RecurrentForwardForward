@@ -323,7 +323,7 @@ class StaticSingleClassProcessor(DataScenarioProcessor):
                     upper_clamped_tensor = self.get_preinit_upper_clamped_tensor(
                         (data.shape[1], self.settings.data_config.num_classes))
 
-                    for _preinit_iteration in range(0, len(self.inner_layers)):
+                    for _preinit_step in range(0, self.settings.model.prelabel_timesteps):
                         self.inner_layers.advance_layers_forward(
                             forward_mode, data[0], upper_clamped_tensor, False)
                         if write_activations:
@@ -430,7 +430,7 @@ class StaticSingleClassProcessor(DataScenarioProcessor):
         iterations = input_batch.shape[0]
 
         # feed data through network and track latents
-        for _preinit_iteration in range(0, len(self.inner_layers)):
+        for _preinit_step in range(0, self.settings.model.prelabel_timesteps):
             self.inner_layers.advance_layers_forward(
                 ForwardMode.PositiveData,
                 input_batch[0],
