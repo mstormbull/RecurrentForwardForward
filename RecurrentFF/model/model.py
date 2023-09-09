@@ -73,15 +73,34 @@ class RecurrentFFNet(nn.Module):
         convolution_stride = 1
         max_pool_kernel_size = 2
         max_pool_stride = 2
-        conv_output_size = calculate_conv_output_dimensions(
-            self.settings.data_config.data_size, self.settings.model.convolutions.output_channels, convolution_kernel_size, convolution_stride, convolution_padding, max_pool_kernel_size, max_pool_stride)
+        # conv_output_size = calculate_conv_output_dimensions(
+        #     self.settings.data_config.data_size, self.settings.model.convolutions.output_channels, convolution_kernel_size, convolution_stride, convolution_padding, max_pool_kernel_size, max_pool_stride)
+        conv_output_size = 1024
 
         conv_layers = nn.Sequential(
             nn.Conv2d(in_channels=convolution_in_channels, out_channels=self.settings.model.convolutions.output_channels,
                       kernel_size=convolution_kernel_size, stride=convolution_stride, padding=convolution_padding),
+            nn.Conv2d(in_channels=self.settings.model.convolutions.output_channels, out_channels=self.settings.model.convolutions.output_channels,
+                      kernel_size=convolution_kernel_size, stride=convolution_stride, padding=convolution_padding),
             nn.ReLU(),
             nn.MaxPool2d(kernel_size=max_pool_kernel_size,
-                         stride=max_pool_stride)
+                         stride=max_pool_stride),
+
+            nn.Conv2d(in_channels=self.settings.model.convolutions.output_channels, out_channels=self.settings.model.convolutions.output_channels * 2,
+                      kernel_size=convolution_kernel_size, stride=convolution_stride, padding=convolution_padding),
+            nn.Conv2d(in_channels=self.settings.model.convolutions.output_channels * 2, out_channels=self.settings.model.convolutions.output_channels * 2,
+                      kernel_size=convolution_kernel_size, stride=convolution_stride, padding=convolution_padding),
+            nn.ReLU(),
+            nn.MaxPool2d(kernel_size=max_pool_kernel_size,
+                         stride=max_pool_stride),
+
+            nn.Conv2d(in_channels=self.settings.model.convolutions.output_channels * 2, out_channels=self.settings.model.convolutions.output_channels * 4,
+                      kernel_size=convolution_kernel_size, stride=convolution_stride, padding=convolution_padding),
+            nn.Conv2d(in_channels=self.settings.model.convolutions.output_channels * 4, out_channels=self.settings.model.convolutions.output_channels * 4,
+                      kernel_size=convolution_kernel_size, stride=convolution_stride, padding=convolution_padding),
+            nn.ReLU(),
+            nn.MaxPool2d(kernel_size=max_pool_kernel_size,
+                         stride=max_pool_stride),
         )
         # for param in conv_layers.parameters():
         #     param.requires_grad = False
