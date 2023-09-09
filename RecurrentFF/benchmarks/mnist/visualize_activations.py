@@ -2,6 +2,7 @@ import torch
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
+import numpy as np
 
 BASE_PATH = "./img/activation_heatmaps"
 SCENARIOS = ["incorrect_activations", "correct_activations"]
@@ -243,7 +244,87 @@ def plot_activations_over_time():
             plt.close()
 
 
+def plot_sparsity_over_time(threshold=0.01):
+    for filename in FILENAMES:
+        identifier = filename.split(".")[0].split("_")[-1]
+        tensors = torch.load(filename)
+
+        for scenario in SCENARIOS:
+            loaded = tensors[scenario]
+
+            # Calculate fraction of values with abs value below the threshold
+            is_sparse = (loaded.abs() < threshold).float()
+            # Fraction of sparse values over neurons
+            sparsity_fraction = is_sparse.mean(dim=-1)
+
+            plt.figure(figsize=(12, 8))
+            for layer in range(sparsity_fraction.shape[-1]):
+                plt.plot(sparsity_fraction[:, layer].cpu().numpy(),
+                         label=f"Layer {layer + 1}")
+
+            # Plotting the average sparsity fraction over all layers
+            avg_over_all_layers = sparsity_fraction.mean(dim=-1)
+            plt.plot(avg_over_all_layers.cpu().numpy(),
+                     label="Average Over All Layers", linestyle='--')
+            plt.ylim(0, 0.2)
+
+            plt.title(f'Sparsity Over Time ({scenario} - {identifier})')
+            plt.xlabel('Time')
+            plt.ylabel('Sparsity Fraction')
+            plt.legend()
+            plt.tight_layout()
+            plt.savefig(
+                f"{BASE_PATH}/sparsity_over_time_{scenario}_{identifier}.png", dpi=300)
+            plt.close()
+
+
+def plot_activation_percentiles_over_time(percentiles=[10, 25, 50, 75, 90]):
+    for filename in FILENAMES:
+        identifier = filename.split(".")[0].split("_")[-1]
+        tensors = torch.load(filename)
+
+        for scenario in SCENARIOS:
+            loaded = tensors[scenario].abs()
+
+            num_layers = loaded.shape[1]
+            percentile_values = {}
+
+            # Calculate percentiles for each layer and time step
+            for layer in range(num_layers):
+                for percentile in percentiles:
+                    # Note the change in axis for percentile computation
+                    values = np.percentile(
+                        loaded[:, layer, :].cpu().numpy(), percentile, axis=-1)
+                    percentile_values[(layer, percentile)] = values
+
+            fig, axes = plt.subplots(
+                num_layers, 1, figsize=(12, 6 * num_layers))
+
+            for layer, ax in enumerate(axes):
+                for percentile in percentiles:
+                    values = percentile_values[(layer, percentile)]
+                    # Displaying the latest time value for brevity
+                    ax.plot(
+                        values, label=f"{percentile}th Percentile")
+
+                ax.set_title(f'Layer {layer + 1}')
+                ax.set_xlabel('Time')
+                ax.set_ylabel('Activation Magnitude')
+                # limit y to 0, 1.5
+                ax.set_ylim(0, 1.5)
+                ax.legend()
+
+            plt.suptitle(
+                f'Activation Magnitudes by Percentile Over Time ({scenario} - {identifier})')
+            plt.tight_layout()
+            plt.savefig(
+                f"{BASE_PATH}/activation_percentiles_over_time_{scenario}_{identifier}.png", dpi=300)
+            plt.close()
+
+
 if __name__ == "__main__":
     plot_mean_stddev()
     plot_activations_over_timesteps()
     plot_activations_over_time()
+    plot_sparsity_over_time()
+    plot_activation_percentiles_over_time()
