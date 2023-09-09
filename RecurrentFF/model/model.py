@@ -186,7 +186,7 @@ class RecurrentFFNet(nn.Module):
 
         self.inner_layers.reset_activations(True)
 
-        for preinit_step in range(0, len(self.inner_layers)):
+        for preinit_step in range(0, self.settings.model.prelabel_timesteps):
             logging.debug("Preinitialization step: " +
                           str(preinit_step))
 

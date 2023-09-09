@@ -45,6 +45,7 @@ class ClassifierAdadelta(BaseModel):
 class Model(BaseModel):
     hidden_sizes: list
     epochs: int
+    prelabel_timesteps: int
     loss_threshold: float
     damping_factor: float
     epsilon: float
