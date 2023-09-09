@@ -305,6 +305,8 @@ class StaticSingleClassProcessor(DataScenarioProcessor):
                 data, labels = test_data
                 data = data.to(self.settings.device.device)
                 labels = labels.to(self.settings.device.device)
+                print("CORRECT LABEL:")
+                print(labels)
 
                 if write_activations:
                     activity_tracker.reinitialize(data, labels)
@@ -318,6 +320,7 @@ class StaticSingleClassProcessor(DataScenarioProcessor):
 
                 # evaluate badness for each possible label
                 for label in range(self.settings.data_config.num_classes):
+                    print("Testing LABEL: " + str(label))
                     self.inner_layers.reset_activations(not is_test_set)
 
                     upper_clamped_tensor = self.get_preinit_upper_clamped_tensor(

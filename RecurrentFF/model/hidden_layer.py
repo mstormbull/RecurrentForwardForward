@@ -389,16 +389,48 @@ class HiddenLayer(nn.Module):
             prev_act_stdized = standardize_layer_activations(
                 prev_act, self.settings.model.epsilon)
 
-            new_activation = F.leaky_relu(
-                F.linear(
-                    prev_layer_stdized,
-                    self.forward_linear.weight) +
-                -1 * F.linear(
-                    next_layer_stdized,
-                    self.backward_linear.weight) +
-                F.linear(
-                    prev_act_stdized,
-                    self.lateral_linear.weight))
+            def compute_correlation(tensor1, tensor2, epsilon=1e-10):
+                """Compute correlation between two tensors along dimension 0."""
+                # Calculate means
+                mean1 = torch.mean(tensor1, dim=0)
+                mean2 = torch.mean(tensor2, dim=0)
+
+                # Calculate centered values
+                centered1 = tensor1 - mean1
+                centered2 = tensor2 - mean2
+
+                # Calculate the covariance and the standard deviations
+                covariance = torch.mean(centered1 * centered2, dim=0)
+                std1 = torch.sqrt(torch.mean(
+                    centered1 ** 2, dim=0) + epsilon)  # Added epsilon
+                std2 = torch.sqrt(torch.mean(
+                    centered2 ** 2, dim=0) + epsilon)  # Added epsilon
+
+                # Calculate the correlation coefficient
+                correlation = covariance / (std1 * std2)
+
+                return correlation
+
+            forwards = F.linear(
+                prev_layer_stdized,
+                self.forward_linear.weight)
+            backwards = -1 * F.linear(
+                next_layer_stdized,
+                self.backward_linear.weight)
+            laterals = F.linear(
+                prev_act_stdized,
+                self.lateral_linear.weight)
+
+            correlation = compute_correlation(forwards, backwards)
+            # print(forwards.shape)
+            # print(backwards.shape)
+            # print(forwards)
+            # print(backwards)
+            # print(laterals)
+            # print(correlation)
+            # print(correlation.cpu().numpy().tolist())
+
+            new_activation = F.leaky_relu(forwards + backwards + laterals)
 
             if should_damp:
                 old_activation = new_activation
