@@ -5,7 +5,7 @@ from torchvision.transforms import Compose, ToTensor, Normalize, Lambda
 import wandb
 
 from RecurrentFF.model.data_scenario.static_single_class import SingleStaticClassTestData
-from RecurrentFF.util import WEIGHTS_PATH, TrainInputData, TrainLabelData, set_logging
+from RecurrentFF.util import TrainInputData, TrainLabelData, set_logging
 from RecurrentFF.model.model import RecurrentFFNet
 from RecurrentFF.settings import Settings, DataConfig
 
@@ -14,6 +14,10 @@ NUM_CLASSES = 10
 TRAIN_BATCH_SIZE = 500
 TEST_BATCH_SIZE = 5000
 ITERATIONS = 10
+DATASET = "MNIST"
+
+# If you want to load weights fill this in.
+WEIGHTS_PATH = ""
 
 
 class CustomTrainDataset(Dataset):
@@ -201,7 +205,8 @@ if __name__ == "__main__":
         "num_classes": NUM_CLASSES,
         "train_batch_size": TRAIN_BATCH_SIZE,
         "test_batch_size": TEST_BATCH_SIZE,
-        "iterations": ITERATIONS}
+        "iterations": ITERATIONS,
+        "dataset": DATASET}
 
     if settings.data_config is None:
         settings.data_config = DataConfig(**data_config)
@@ -219,7 +224,7 @@ if __name__ == "__main__":
         # track hyperparameters and run metadata
         config={
             "architecture": "Recurrent-FF",
-            "dataset": "MNIST",
+            "dataset": DATASET,
             "settings": settings.model_dump(),
         }
     )

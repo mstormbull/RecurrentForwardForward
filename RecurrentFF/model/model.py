@@ -1,4 +1,7 @@
+from datetime import datetime
 import logging
+import random
+import string
 
 
 import torch
@@ -13,7 +16,6 @@ from RecurrentFF.model.data_scenario.static_single_class import (
 from RecurrentFF.model.hidden_layer import HiddenLayer
 from RecurrentFF.model.inner_layers import InnerLayers, LayerMetrics
 from RecurrentFF.util import (
-    WEIGHTS_PATH,
     ForwardMode,
     LatentAverager,
     ValidationLoader,
@@ -96,6 +98,10 @@ class RecurrentFFNet(nn.Module):
         self.processor = StaticSingleClassProcessor(
             self.inner_layers, self.settings)
 
+        self.weights_file_name = self.settings.data_config.dataset + \
+            "_" + datetime.now().strftime("%Y-%m-%d_%H-%M-%S") + "_" + ''.join(
+                random.choices(string.ascii_uppercase + string.digits, k=6)) + ".pth"
+
         logging.info("Finished initializing network")
 
     def predict(self, data_scenario: DataScenario, data_loader, num_batches: int, write_activations=False):
@@ -165,7 +171,7 @@ class RecurrentFFNet(nn.Module):
 
             if test_accuracy > best_test_accuracy:
                 best_test_accuracy = test_accuracy
-                torch.save(self.state_dict(), WEIGHTS_PATH)
+                torch.save(self.state_dict(), self.weights_file_name)
 
             if self.settings.model.should_log_metrics:
                 self.__log_epoch_metrics(

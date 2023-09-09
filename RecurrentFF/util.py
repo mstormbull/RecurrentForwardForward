@@ -3,8 +3,6 @@ import logging
 
 import torch
 
-WEIGHTS_PATH = "weights.pth"
-
 
 def set_logging():
     """

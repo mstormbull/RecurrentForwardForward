@@ -2,7 +2,7 @@ import torch
 
 from RecurrentFF.benchmarks.mnist.mnist import DATA_SIZE, ITERATIONS, NUM_CLASSES, TRAIN_BATCH_SIZE, MNIST_loaders
 from RecurrentFF.model.data_scenario.processor import DataScenario
-from RecurrentFF.util import WEIGHTS_PATH, set_logging
+from RecurrentFF.util import set_logging
 from RecurrentFF.model.model import RecurrentFFNet
 from RecurrentFF.settings import Settings, DataConfig
 
