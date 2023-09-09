@@ -68,6 +68,16 @@ def amplified_initialization(layer: nn.Linear, amplification_factor=3.0):
     nn.init.normal_(layer.weight, mean=0, std=amplified_std)
 
 
+def create_enforce_diagonal_grad_hook(settings):
+
+    def enforce_diagonal_grad(grad):
+        # Create a mask that is 1 along the diagonal and 0 elsewhere
+        mask = torch.eye(grad.size(0), grad.size(1)).to(settings.device.device)
+        return grad * mask
+
+    return enforce_diagonal_grad
+
+
 class HiddenLayer(nn.Module):
     """
     A HiddenLayer class for a novel Forward-Forward Recurrent Network, with
@@ -132,7 +142,12 @@ class HiddenLayer(nn.Module):
 
         # Initialize the lateral weights to be the identity matrix
         self.lateral_linear = nn.Linear(size, size)
-        nn.init.orthogonal_(self.lateral_linear.weight, gain=math.sqrt(2))
+        # Initialize the lateral weights to be the identity matrix
+        nn.init.eye_(self.lateral_linear.weight)
+        self.lateral_linear.weight.register_hook(
+            create_enforce_diagonal_grad_hook(self.settings))
+        self.lateral_linear.bias.data.zero_()
+        # nn.init.orthogonal_(self.lateral_linear.weight, gain=math.sqrt(2))
 
         self.previous_layer = None
         self.next_layer = None
