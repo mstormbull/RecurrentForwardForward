@@ -205,6 +205,45 @@ def plot_activations_over_timesteps():
             plt.savefig(f"{BASE_PATH}/{scenario}_{identifier}.png", dpi=300)
 
 
+def plot_activations_over_time():
+    for filename in FILENAMES:
+        identifier = filename.split(".")[0].split("_")[-1]
+        tensors = torch.load(filename)
+
+        for scenario in SCENARIOS:
+            loaded = tensors[scenario]
+
+            # Compute L2 norms over neurons
+            l2_norms = torch.norm(loaded, p=2, dim=-1)
+
+            avg_l2_norms = l2_norms
+
+            # # Now, average the L2 norms over the batches for each layer
+            # avg_l2_norms = l2_norms.mean(dim=0)
+            # print(avg_l2_norms.shape)
+
+            plt.figure(figsize=(12, 8))
+            for layer in range(avg_l2_norms.shape[-1]):
+                plt.plot(avg_l2_norms[:, layer].cpu().numpy(),
+                         label=f"Layer {layer + 1}")
+
+            # Plotting the average L2 norm over all layers
+            avg_over_all_layers = avg_l2_norms.mean(dim=-1)
+            plt.plot(avg_over_all_layers.cpu().numpy(),
+                     label="Average Over All Layers", linestyle='--')
+
+            plt.title(
+                f'L2 Norm of Activations Over Time ({scenario} - {identifier})')
+            plt.xlabel('Time')
+            plt.ylabel('L2 Norm')
+            plt.legend()
+            plt.tight_layout()
+            plt.savefig(
+                f"{BASE_PATH}/l2norm_over_time_{scenario}_{identifier}.png", dpi=300)
+            plt.close()
+
+
 if __name__ == "__main__":
     plot_mean_stddev()
     plot_activations_over_timesteps()
+    plot_activations_over_time()
