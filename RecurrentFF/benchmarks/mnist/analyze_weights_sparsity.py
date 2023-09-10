@@ -3,6 +3,55 @@ import matplotlib.pyplot as plt
 import torch
 
 
+def plot_heatmap(weights, layer_idx, vmin, vmax):
+    """Plot the heatmap of weights for a specific layer."""
+
+    forward_key = f"inner_layers.layers.{layer_idx}.forward_linear.weight"
+    recurrent_key = f"inner_layers.layers.{layer_idx}.lateral_linear.weight"
+    backward_key = f"inner_layers.layers.{layer_idx}.backward_linear.weight"
+
+    # Extract weights
+    forward_weights = weights[forward_key].detach().cpu().numpy()
+    recurrent_weights = weights[recurrent_key].detach().cpu().numpy()
+    backward_weights = weights[backward_key].detach().cpu().numpy()
+
+    weight_types = {
+        "Forward": forward_weights,
+        "Recurrent": recurrent_weights,
+        "Backward": backward_weights
+    }
+
+    for name, weight_matrix in weight_types.items():
+        plt.figure(figsize=(8, 8))
+        plt.imshow(weight_matrix, cmap='viridis',
+                   vmin=vmin, vmax=vmax, aspect='auto')
+        plt.colorbar()
+        plt.title(f'Layer {layer_idx} - {name} Weights')
+        plt.xlabel('Neurons')
+        plt.ylabel('Neurons')
+        plt.tight_layout()
+        plt.savefig(
+            f"img/weight_heatmaps/layer_{layer_idx}_{name}_heatmap.png")
+
+
+def get_global_min_max(weights, layers):
+    """Find the global minimum and maximum values across all weights."""
+    all_weights = []
+    for i in range(layers):
+        forward_key = f"inner_layers.layers.{i}.forward_linear.weight"
+        recurrent_key = f"inner_layers.layers.{i}.lateral_linear.weight"
+        backward_key = f"inner_layers.layers.{i}.backward_linear.weight"
+
+        all_weights.extend([
+            weights[forward_key].detach().cpu().numpy().flatten(),
+            weights[recurrent_key].detach().cpu().numpy().flatten(),
+            weights[backward_key].detach().cpu().numpy().flatten()
+        ])
+
+    all_weights = np.concatenate(all_weights)
+    return np.min(all_weights), np.max(all_weights)
+
+
 def plot_density_function(weights, layer_idx):
     """Plot the density function of weight sparsities for a specific layer."""
 
@@ -43,6 +92,18 @@ def plot_density_function(weights, layer_idx):
 
 # Assuming you're using the same loading code as before
 weights = torch.load("weights_9-2.pth")
-layers = 3
+layers = len(weights) // 6
+
+# for i in range(layers):
+#     plot_density_function(weights, i)
+
+
+# Get global min and max values for consistent scale
+vmin, vmax = get_global_min_max(weights, layers)
+scaling_factor = 6
+vmin = vmin // scaling_factor
+vmax = vmax // scaling_factor
+
+# Plot the heatmaps
 for i in range(layers):
-    plot_density_function(weights, i)
+    plot_heatmap(weights, i, vmin, vmax)

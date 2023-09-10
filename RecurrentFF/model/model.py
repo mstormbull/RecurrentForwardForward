@@ -8,8 +8,8 @@ import torch
 from torch import nn
 import wandb
 from profilehooks import profile
-from RecurrentFF.model.data_scenario.processor import DataScenario
 
+from RecurrentFF.model.data_scenario.processor import DataScenario
 from RecurrentFF.model.data_scenario.static_single_class import (
     StaticSingleClassProcessor,
 )
