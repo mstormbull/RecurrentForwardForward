@@ -1,13 +1,13 @@
 import torch
 
-from RecurrentFF.benchmarks.mnist.mnist import DATA_SIZE, ITERATIONS, NUM_CLASSES, TRAIN_BATCH_SIZE, MNIST_loaders
+from RecurrentFF.benchmarks.moving_mnist.moving_mnist import DATA_SIZE, ITERATIONS, NUM_CLASSES, TRAIN_BATCH_SIZE, MNIST_loaders
 from RecurrentFF.model.data_scenario.processor import DataScenario
 from RecurrentFF.util import set_logging
 from RecurrentFF.model.model import RecurrentFFNet
 from RecurrentFF.settings import Settings, DataConfig
 
-TEST_BATCH_SIZE = 1
-NUM_BATCHES = 2
+TEST_BATCH_SIZE = 1000
+NUM_BATCHES = 1
 
 if __name__ == "__main__":
     settings = Settings.new()
@@ -37,7 +37,8 @@ if __name__ == "__main__":
     # Create and run model.
     model = RecurrentFFNet(settings).to(settings.device.device)
 
-    model.load_state_dict(torch.load("weights_9-2.pth"))
+    model.load_state_dict(torch.load(
+        "Moving-MNIST_2023-09-09_01-47-14_YUS9YP.pth"))
 
     model.predict(DataScenario.StaticSingleClass,
-                  test_loader, NUM_BATCHES, write_activations=True)
+                  test_loader, NUM_BATCHES, write_activations=False)
