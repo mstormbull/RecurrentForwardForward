@@ -294,12 +294,12 @@ class StaticSingleClassProcessor(DataScenarioProcessor):
 
         forward_mode = ForwardMode.PredictData if is_test_set else ForwardMode.PositiveData
 
+        # tuple: (correct, total)
+        accuracy_contexts = []
+
         for batch, test_data in enumerate(loader):
             if limit_batches is not None and batch == limit_batches:
                 break
-
-            # tuple: (correct, total)
-            accuracy_contexts = []
 
             with torch.no_grad():
                 data, labels = test_data
@@ -394,6 +394,7 @@ class StaticSingleClassProcessor(DataScenarioProcessor):
 
                 accuracy_contexts.append((correct, total))
 
+        print(accuracy_contexts)
         total_correct = sum(correct for correct, _total in accuracy_contexts)
         total_submissions = sum(
             total for _correct, total in accuracy_contexts)

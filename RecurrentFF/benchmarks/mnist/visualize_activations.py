@@ -8,6 +8,29 @@ BASE_PATH = "./img/activation_heatmaps"
 SCENARIOS = ["incorrect_activations", "correct_activations"]
 FILENAMES = ["test_sample_1.pt", "test_sample_2.pt"]
 
+# Additional function to plot the digit
+
+
+def plot_digit():
+    for filename in FILENAMES:
+        identifier = filename.split(".")[0].split("_")[-1]
+        tensors = torch.load(filename)
+
+        data = tensors["data"]
+
+        # Ensure the tensor is in CPU and convert it to numpy for visualization
+        data_numpy = data.cpu().numpy()
+
+        # Reshape the data into a square shape
+        side_length = int(data_numpy.size**0.5)
+        data_square = data_numpy.reshape(side_length, side_length)
+
+        # Plot the digit
+        plt.imshow(data_square, cmap='gray')
+        plt.axis('off')  # Turn off axis numbers and ticks
+        plt.savefig(f"{BASE_PATH}/digit_{identifier}.png", dpi=300)
+        plt.close()
+
 
 def plot_mean_stddev():
     running_sum_activations = None
@@ -323,8 +346,9 @@ def plot_activation_percentiles_over_time(percentiles=[10, 25, 50, 75, 90]):
 
 
 if __name__ == "__main__":
-    plot_mean_stddev()
-    plot_activations_over_timesteps()
-    plot_activations_over_time()
-    plot_sparsity_over_time()
-    plot_activation_percentiles_over_time()
+    plot_digit()
+    # plot_mean_stddev()
+    # plot_activations_over_timesteps()
+    # plot_activations_over_time()
+    # plot_sparsity_over_time()
+    # plot_activation_percentiles_over_time()

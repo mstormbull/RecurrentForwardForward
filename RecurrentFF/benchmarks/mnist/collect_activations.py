@@ -6,8 +6,8 @@ from RecurrentFF.util import set_logging
 from RecurrentFF.model.model import RecurrentFFNet
 from RecurrentFF.settings import Settings, DataConfig
 
-TEST_BATCH_SIZE = 1000
-NUM_BATCHES = 1
+TEST_BATCH_SIZE = 1
+NUM_BATCHES = 3
 
 if __name__ == "__main__":
     settings = Settings.new()
@@ -38,7 +38,7 @@ if __name__ == "__main__":
     model = RecurrentFFNet(settings).to(settings.device.device)
 
     model.load_state_dict(torch.load(
-        "Moving-MNIST_2023-09-09_01-47-14_YUS9YP.pth"))
+        "Moving-MNIST_2023-09-09_01-12-31_W25KUR.pth", map_location=torch.device('cpu')))
 
     model.predict(DataScenario.StaticSingleClass,
-                  test_loader, NUM_BATCHES, write_activations=False)
+                  test_loader, NUM_BATCHES, write_activations=True)
