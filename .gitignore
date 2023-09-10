@@ -14,3 +14,4 @@ sequences
 *.pth
 *.pt
 cifar-data/
+.DS_Store
