@@ -294,12 +294,20 @@ class HiddenLayer(nn.Module):
         pos_badness = layer_activations_to_badness(pos_activations)
         neg_badness = layer_activations_to_badness(neg_activations)
 
+        # Compute the L1 regularization penalty for all the parameters in the layer
+        l1_penalty = 0.0
+        # Assuming you have lambda in settings
+        lambda_l1 = self.settings.model.lambda_l1
+        for params in self.parameters():
+            l1_penalty += params.abs().sum()
+
         # Loss function equivelent to:
         # plot3d log(1 + exp(-n + 1)) + log(1 + exp(p - 1)) for n=0 to 3, p=0 to 3
         layer_loss = F.softplus(torch.cat([
             (-1 * neg_badness) + self.settings.model.loss_threshold,
             pos_badness - self.settings.model.loss_threshold
         ])).mean()
+        total_loss = layer_loss + lambda_l1 * l1_penalty
         layer_loss.backward()
 
         self.optimizer.step()

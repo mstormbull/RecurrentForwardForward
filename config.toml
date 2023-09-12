@@ -13,6 +13,7 @@ ff_activation = "relu"
 ff_optimizer = "rmsprop"
 classifier_optimizer = "adam"
 interconnect_density = 1
+lambda_l1
 should_log_metrics = true 
 should_replace_neg_data = false
 should_load_weights = false
