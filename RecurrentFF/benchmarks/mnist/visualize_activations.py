@@ -6,7 +6,7 @@ import numpy as np
 
 BASE_PATH = "./img/activation_heatmaps"
 SCENARIOS = ["incorrect_activations", "correct_activations"]
-FILENAMES = ["test_sample_1.pt", "test_sample_2.pt"]
+FILENAMES = ["test_sample_1.pt", "test_sample_3.pt"]
 
 
 def plot_mean_stddev():
@@ -323,8 +323,8 @@ def plot_activation_percentiles_over_time(percentiles=[10, 25, 50, 75, 90]):
 
 
 if __name__ == "__main__":
-    plot_mean_stddev()
-    plot_activations_over_timesteps()
-    plot_activations_over_time()
-    plot_sparsity_over_time()
+    # plot_mean_stddev()
+    # plot_activations_over_timesteps()
+    # plot_activations_over_time()
+    # plot_sparsity_over_time()
     plot_activation_percentiles_over_time()

@@ -297,6 +297,10 @@ class StaticSingleClassProcessor(DataScenarioProcessor):
         # tuple: (correct, total)
         accuracy_contexts = []
 
+        forward_activations = []
+        backward_activations = []
+        lateral_activations = []
+
         for batch, test_data in enumerate(loader):
             if limit_batches is not None and batch == limit_batches:
                 break
@@ -305,6 +309,7 @@ class StaticSingleClassProcessor(DataScenarioProcessor):
                 data, labels = test_data
                 data = data.to(self.settings.device.device)
                 labels = labels.to(self.settings.device.device)
+                print(labels[0])
 
                 if write_activations:
                     activity_tracker.reinitialize(data, labels)
@@ -318,6 +323,9 @@ class StaticSingleClassProcessor(DataScenarioProcessor):
 
                 # evaluate badness for each possible label
                 for label in range(self.settings.data_config.num_classes):
+                    print(label)
+                    input()
+
                     self.inner_layers.reset_activations(not is_test_set)
 
                     upper_clamped_tensor = self.get_preinit_upper_clamped_tensor(
@@ -329,6 +337,12 @@ class StaticSingleClassProcessor(DataScenarioProcessor):
                         if write_activations:
                             activity_tracker.track_partial_activations(
                                 self.inner_layers)
+                            forward_activations.append(
+                                self.inner_layers.layers[1].forward_act)
+                            backward_activations.append(
+                                self.inner_layers.layers[1].backward_act)
+                            lateral_activations.append(
+                                self.inner_layers.layers[1].lateral_act)
 
                     one_hot_labels = torch.zeros(
                         data.shape[1],
@@ -347,6 +361,12 @@ class StaticSingleClassProcessor(DataScenarioProcessor):
                         if write_activations:
                             activity_tracker.track_partial_activations(
                                 self.inner_layers)
+                            forward_activations.append(
+                                self.inner_layers.layers[1].forward_act)
+                            backward_activations.append(
+                                self.inner_layers.layers[1].backward_act)
+                            lateral_activations.append(
+                                self.inner_layers.layers[1].lateral_act)
 
                         if iteration >= lower_iteration_threshold and iteration <= upper_iteration_threshold:
                             layer_badnesses = []
@@ -361,6 +381,14 @@ class StaticSingleClassProcessor(DataScenarioProcessor):
 
                             badnesses.append(torch.stack(
                                 layer_badnesses, dim=1))
+
+                    torch.save({"forward": torch.stack(forward_activations),
+                                "backward": torch.stack(backward_activations),
+                                "lateral": torch.stack(lateral_activations)},
+                               f"activations_{label}.pt")
+                    forward_activations = []
+                    backward_activations = []
+                    lateral_activations = []
 
                     if write_activations:
                         activity_tracker.cut_activations()

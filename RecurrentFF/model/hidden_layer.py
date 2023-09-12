@@ -389,16 +389,24 @@ class HiddenLayer(nn.Module):
             prev_act_stdized = standardize_layer_activations(
                 prev_act, self.settings.model.epsilon)
 
-            new_activation = F.leaky_relu(
-                F.linear(
-                    prev_layer_stdized,
-                    self.forward_linear.weight) +
-                -1 * F.linear(
-                    next_layer_stdized,
-                    self.backward_linear.weight) +
-                F.linear(
-                    prev_act_stdized,
-                    self.lateral_linear.weight))
+            forward = F.linear(
+                prev_layer_stdized,
+                self.forward_linear.weight)
+            backward = -1 * F.linear(
+                next_layer_stdized,
+                self.backward_linear.weight)
+            lateral = F.linear(
+                prev_act_stdized,
+                self.lateral_linear.weight)
+
+            self.forward_act = forward
+            self.backward_act = backward
+            self.lateral_act = lateral
+
+            new_activation = F.leaky_relu(forward + backward + lateral)
+            print(
+                f"no relu: {(forward + backward + lateral).flatten().mean()}")
+            print(f"relu: {new_activation.flatten().mean()}")
 
             if should_damp:
                 old_activation = new_activation
