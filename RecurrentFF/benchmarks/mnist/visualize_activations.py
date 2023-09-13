@@ -3,10 +3,11 @@ import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
 import numpy as np
+from torch.nn import functional as F
 
 BASE_PATH = "./img/activation_heatmaps"
-SCENARIOS = ["incorrect_activations", "correct_activations"]
-FILENAMES = ["test_sample_1.pt", "test_sample_3.pt"]
+SCENARIOS = ["correct_activations", "incorrect_activations"]
+FILENAMES = ["test_sample_1.pt", "test_sample_2.pt", "test_sample_3.pt"]
 
 
 def plot_mean_stddev():
@@ -206,7 +207,7 @@ def plot_activations_over_timesteps():
             plt.savefig(f"{BASE_PATH}/{scenario}_{identifier}.png", dpi=300)
 
 
-def plot_activations_over_time():
+def plot_activations_l2_over_time():
     for filename in FILENAMES:
         identifier = filename.split(".")[0].split("_")[-1]
         tensors = torch.load(filename)
@@ -278,7 +279,7 @@ def plot_sparsity_over_time(threshold=0.01):
             plt.close()
 
 
-def plot_activation_percentiles_over_time(percentiles=[10, 25, 50, 75, 90]):
+def plot_activation_percentiles_over_time(percentiles=[10, 25, 50, 75, 90, 95, 99]):
     for filename in FILENAMES:
         identifier = filename.split(".")[0].split("_")[-1]
         tensors = torch.load(filename)
@@ -323,8 +324,8 @@ def plot_activation_percentiles_over_time(percentiles=[10, 25, 50, 75, 90]):
 
 
 if __name__ == "__main__":
-    # plot_mean_stddev()
-    # plot_activations_over_timesteps()
-    # plot_activations_over_time()
-    # plot_sparsity_over_time()
+    plot_mean_stddev()
+    plot_activations_over_timesteps()
+    plot_activations_l2_over_time()
+    plot_sparsity_over_time()
     plot_activation_percentiles_over_time()

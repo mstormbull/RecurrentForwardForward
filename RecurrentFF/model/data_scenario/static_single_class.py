@@ -32,34 +32,91 @@ class StaticSingleClassActivityTracker():
     def __init__(self):
         self.data = None
         self.labels = None
+
         self.activations = []
+        self.forward_activations = []
+        self.backward_activations = []
+        self.lateral_activations = []
+
         self.partial_activations = []
+        self.partial_forward_activations = []
+        self.partial_backward_activations = []
+        self.partial_lateral_activations = []
+
         self.tracked_samples = 0
 
     def reinitialize(self, data, labels):
         self.data = data[0][0]  # first batch, first timestep
         self.labels = labels.squeeze(1)
+
         self.activations = []
+        self.forward_activations = []
+        self.backward_activations = []
+        self.lateral_activations = []
+
         self.partial_activations = []
+        self.partial_forward_activations = []
+        self.partial_backward_activations = []
+        self.partial_lateral_activations = []
+
         self.tracked_samples += 1
 
     def track_partial_activations(self, layers: InnerLayers):
         build = []
+        build_forward = []
+        build_backward = []
+        build_lateral = []
         for layer in layers:
             build.append(layer.predict_activations.current)
+            build_forward.append(layer.forward_act)
+            build_backward.append(layer.backward_act)
+            build_lateral.append(layer.lateral_act)
+
         self.partial_activations.append(torch.stack(build).squeeze(1))
+        self.partial_forward_activations.append(
+            torch.stack(build_forward).squeeze(1))
+        self.partial_backward_activations.append(
+            torch.stack(build_backward).squeeze(1))
+        self.partial_lateral_activations.append(
+            torch.stack(build_lateral).squeeze(1))
 
     def cut_activations(self):
         self.activations.append(torch.stack(self.partial_activations))
+        self.forward_activations.append(
+            torch.stack(self.partial_forward_activations))
+        self.backward_activations.append(
+            torch.stack(self.partial_backward_activations))
+        self.lateral_activations.append(
+            torch.stack(self.partial_lateral_activations))
+
         self.partial_activations = []
+        self.partial_forward_activations = []
+        self.partial_backward_activations = []
+        self.partial_lateral_activations = []
 
     def filter_and_persist(self, predicted_labels, anti_predictions, actual_labels):
         if predicted_labels == actual_labels:
             predicted_labels_index = predicted_labels.item()
             anti_prediction_index = anti_predictions.item()
 
+            # print(predicted_labels)
+            # print(actual_labels)
+            # print(anti_predictions)
+            # print("0---")
+            # print(len(self.forward_activations))
+            # print(len(self.backward_activations))
+            # print(len(self.lateral_activations))
+            # input()
+
             correct_activations = self.activations[predicted_labels_index]
+            correct_forward_activations = self.forward_activations[predicted_labels_index]
+            correct_backward_activations = self.backward_activations[predicted_labels_index]
+            correct_lateral_activations = self.lateral_activations[predicted_labels_index]
+
             incorrect_activations = self.activations[anti_prediction_index]
+            incorrect_forward_activations = self.forward_activations[anti_prediction_index]
+            incorrect_backward_activations = self.backward_activations[anti_prediction_index]
+            incorrect_lateral_activations = self.lateral_activations[anti_prediction_index]
 
             logging.debug(f"Correct activations: {correct_activations.shape}")
             logging.debug(
@@ -69,15 +126,30 @@ class StaticSingleClassActivityTracker():
 
             torch.save({
                 "correct_activations": correct_activations,
+                "correct_forward_activations": correct_forward_activations,
+                "correct_backward_activations": correct_backward_activations,
+                "correct_lateral_activations": correct_lateral_activations,
                 "incorrect_activations": incorrect_activations,
+                "incorrect_forward_activations": incorrect_forward_activations,
+                "incorrect_backward_activations": incorrect_backward_activations,
+                "incorrect_lateral_activations": incorrect_lateral_activations,
                 "data": self.data,
                 "labels": self.labels
             },
                 f"test_sample_{self.tracked_samples}.pt")
 
         else:
+            logging.warn("Predicted label does not match actual label")
             self.activations = []
+            self.forward_activations = []
+            self.backward_activations = []
+            self.lateral_activations = []
+
             self.partial_activations = []
+            self.partial_forward_activations = []
+            self.partial_backward_activations = []
+            self.partial_lateral_activations = []
+
             self.data = None
             self.labels = None
 
@@ -297,10 +369,6 @@ class StaticSingleClassProcessor(DataScenarioProcessor):
         # tuple: (correct, total)
         accuracy_contexts = []
 
-        forward_activations = []
-        backward_activations = []
-        lateral_activations = []
-
         for batch, test_data in enumerate(loader):
             if limit_batches is not None and batch == limit_batches:
                 break
@@ -309,7 +377,6 @@ class StaticSingleClassProcessor(DataScenarioProcessor):
                 data, labels = test_data
                 data = data.to(self.settings.device.device)
                 labels = labels.to(self.settings.device.device)
-                print(labels[0])
 
                 if write_activations:
                     activity_tracker.reinitialize(data, labels)
@@ -323,9 +390,6 @@ class StaticSingleClassProcessor(DataScenarioProcessor):
 
                 # evaluate badness for each possible label
                 for label in range(self.settings.data_config.num_classes):
-                    print(label)
-                    input()
-
                     self.inner_layers.reset_activations(not is_test_set)
 
                     upper_clamped_tensor = self.get_preinit_upper_clamped_tensor(
@@ -337,12 +401,6 @@ class StaticSingleClassProcessor(DataScenarioProcessor):
                         if write_activations:
                             activity_tracker.track_partial_activations(
                                 self.inner_layers)
-                            forward_activations.append(
-                                self.inner_layers.layers[1].forward_act)
-                            backward_activations.append(
-                                self.inner_layers.layers[1].backward_act)
-                            lateral_activations.append(
-                                self.inner_layers.layers[1].lateral_act)
 
                     one_hot_labels = torch.zeros(
                         data.shape[1],
@@ -361,12 +419,6 @@ class StaticSingleClassProcessor(DataScenarioProcessor):
                         if write_activations:
                             activity_tracker.track_partial_activations(
                                 self.inner_layers)
-                            forward_activations.append(
-                                self.inner_layers.layers[1].forward_act)
-                            backward_activations.append(
-                                self.inner_layers.layers[1].backward_act)
-                            lateral_activations.append(
-                                self.inner_layers.layers[1].lateral_act)
 
                         if iteration >= lower_iteration_threshold and iteration <= upper_iteration_threshold:
                             layer_badnesses = []
@@ -381,14 +433,6 @@ class StaticSingleClassProcessor(DataScenarioProcessor):
 
                             badnesses.append(torch.stack(
                                 layer_badnesses, dim=1))
-
-                    torch.save({"forward": torch.stack(forward_activations),
-                                "backward": torch.stack(backward_activations),
-                                "lateral": torch.stack(lateral_activations)},
-                               f"activations_{label}.pt")
-                    forward_activations = []
-                    backward_activations = []
-                    lateral_activations = []
 
                     if write_activations:
                         activity_tracker.cut_activations()
