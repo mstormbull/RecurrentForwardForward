@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 from torch.nn import functional as F
 
 from sklearn.metrics.pairwise import cosine_similarity
+from sklearn.decomposition import PCA
 
 
 OUTPUT_ACTIVATION_LIMIT_LOWER = -0.5
@@ -57,21 +58,26 @@ def plot_cosine_similarity_multi_file(file_names, activation_type="correct"):
             for act1, act2 in comparisons:
                 # Fetch the data for the first activation type for the current layer
                 data1 = accum_data[f'{activation_type}_{act1}_activations'][:, layer, :].cpu(
-                )
+                ).numpy()
 
                 # For combined pairs like "backward + lateral", we add the activations
                 if '+' in act2:
                     act2_parts = act2.split('+')
                     act2_parts = [a.strip() for a in act2_parts]
                     data2 = sum(
-                        accum_data[f'{activation_type}_{a}_activations'][:, layer, :].cpu() for a in act2_parts)
+                        accum_data[f'{activation_type}_{a}_activations'][:, layer, :].cpu().numpy() for a in act2_parts)
                 else:
                     data2 = accum_data[f'{activation_type}_{act2}_activations'][:, layer, :].cpu(
-                    )
+                    ).numpy()
+
+                all_data = np.concatenate([data1, data2], axis=0)
+                pca = PCA(n_components=5).fit(all_data)
+                data1_projected = pca.transform(data1)
+                data2_projected = pca.transform(data2)
 
                 # Compute cosine similarity for each time step
-                cos_sim = [cosine_similarity(data1[i].unsqueeze(0), data2[i].unsqueeze(0))[0][0]
-                           for i in range(data1.size(0))]
+                cos_sim = [cosine_similarity(data1_projected[i].reshape(1, -1), data2_projected[i].reshape(1, -1))[0][0]
+                           for i in range(data1_projected.shape[0])]
 
                 ax.plot(cos_sim, label=f'Cosine Similarity: {act1} :: {act2}')
                 ax.set_title(
@@ -272,11 +278,13 @@ def plot_activation_heatmap(file_name, activation_type="correct"):
             data[f'{activation_type}_backward_activations'] +
             data[f'{activation_type}_lateral_activations']
         )[:, layer, :]
-        summed_activations = torch.abs(summed_activations)
+        summed_activations = summed_activations
 
         # With leaky_relu
         summed_activations_leaky = F.leaky_relu(
-            summed_activations).cpu().numpy()
+            summed_activations)
+        summed_activations_leaky = torch.abs(
+            summed_activations_leaky).cpu().numpy()
 
         # Without leaky_relu
         summed_activations = summed_activations.cpu().numpy()
