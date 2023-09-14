@@ -6,8 +6,8 @@ from torch.nn import functional as F
 from sklearn.metrics.pairwise import cosine_similarity
 
 
-OUTPUT_ACTIVATION_LIMIT_LOWER = -1
-OUTPUT_ACTIVATION_LIMIT_UPPER = 1
+OUTPUT_ACTIVATION_LIMIT_LOWER = -0.5
+OUTPUT_ACTIVATION_LIMIT_UPPER = 8
 
 
 def plot_cosine_similarity_multi_file(file_names, activation_type="correct"):
@@ -254,7 +254,7 @@ def plot_activation_heatmap(file_name, activation_type="correct"):
 
     # Plotting the heatmap for the actual combined activations
     for layer in range(3):
-        actual_combined = data[f'{activation_type}_activations'][:, layer, :].cpu(
+        actual_combined = torch.abs(data[f'{activation_type}_activations'][:, layer, :]).cpu(
         ).numpy()
         ax = axes[5, layer]
         cax = ax.imshow(actual_combined, aspect='auto',
@@ -272,6 +272,7 @@ def plot_activation_heatmap(file_name, activation_type="correct"):
             data[f'{activation_type}_backward_activations'] +
             data[f'{activation_type}_lateral_activations']
         )[:, layer, :]
+        summed_activations = torch.abs(summed_activations)
 
         # With leaky_relu
         summed_activations_leaky = F.leaky_relu(
