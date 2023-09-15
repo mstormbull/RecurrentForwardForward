@@ -10,6 +10,8 @@ from sklearn.decomposition import PCA
 OUTPUT_ACTIVATION_LIMIT_LOWER = -0.5
 OUTPUT_ACTIVATION_LIMIT_UPPER = 8
 
+BASE_PT_PATH = "./artifacts/activations"
+
 
 def plot_cosine_similarity_multi_file(file_names, activation_type="correct"):
     # Initialize the activation accumulator
@@ -17,7 +19,7 @@ def plot_cosine_similarity_multi_file(file_names, activation_type="correct"):
 
     for file_name in file_names:
         # Load the tensor for each file
-        data = torch.load(file_name)
+        data = torch.load(f"{BASE_PT_PATH}/{file_name}")
         if accum_data is None:
             # If this is the first file, initialize accum_data with the same keys and shapes as the loaded data
             accum_data = {key: torch.zeros_like(
@@ -46,7 +48,7 @@ def plot_cosine_similarity_multi_file(file_names, activation_type="correct"):
     ]
 
     # Number of layers
-    n_layers = 3
+    n_layers = data["incorrect_lateral_activations"].shape[1]
 
     # Create figure and axes for the cosine similarity plots for each layer
     fig, axes = plt.subplots(n_layers, 2, figsize=(20, 20))
@@ -95,7 +97,7 @@ def plot_cosine_similarity_multi_file(file_names, activation_type="correct"):
 
 def plot_cosine_similarity(file_name, activation_type="correct"):
     # Load the tensor
-    data = torch.load(file_name)
+    data = torch.load(f"{BASE_PT_PATH}/{file_name}")
 
     # Activation pair names
     basic_comparisons = [
@@ -155,15 +157,16 @@ def plot_cosine_similarity(file_name, activation_type="correct"):
 
 def plot_l2_norm_across_time(file_name, activation_type="correct"):
     # Load the tensor
-    data = torch.load(file_name)
+    data = torch.load(f"{BASE_PT_PATH}/{file_name}")
+    num_layers = data["incorrect_lateral_activations"].shape[1]
 
     # Create a figure and axes for the 3 rows (layers) and 2 columns (L2 norm and mean) of subplots
-    fig, axes = plt.subplots(3, 2, figsize=(20, 15))
+    fig, axes = plt.subplots(num_layers, 2, figsize=(20, 15))
 
     activations_names = ['forward', 'backward', 'lateral']
 
     # Compute and plot the L2 norm and mean of the activations for the 3 layers
-    for layer in range(3):
+    for layer in range(num_layers):
 
         # Plotting L2 Norm
         ax_l2 = axes[layer, 0]
@@ -237,7 +240,7 @@ def plot_l2_norm_across_time(file_name, activation_type="correct"):
 
 def plot_activation_heatmap(file_name, activation_type="correct"):
     # Load the tensor
-    data = torch.load(file_name)
+    data = torch.load(f"{BASE_PT_PATH}/{file_name}")
 
     # Create figure and axes for the 6 subplots for 3 layers (1 additional subplot for the combined activations)
     fig, axes = plt.subplots(6, 3, figsize=(30, 30))
@@ -317,14 +320,14 @@ def plot_activation_heatmap(file_name, activation_type="correct"):
 
 if __name__ == '__main__':
 
-    plot_l2_norm_across_time('test_sample_3.pt', activation_type="correct")
-    plot_l2_norm_across_time('test_sample_3.pt', activation_type="incorrect")
+    # plot_l2_norm_across_time('test_sample_3.pt', activation_type="correct")
+    # plot_l2_norm_across_time('test_sample_3.pt', activation_type="incorrect")
 
-    plot_activation_heatmap('test_sample_3.pt', activation_type="correct")
-    plot_activation_heatmap('test_sample_3.pt', activation_type="incorrect")
+    # plot_activation_heatmap('test_sample_3.pt', activation_type="correct")
+    # plot_activation_heatmap('test_sample_3.pt', activation_type="incorrect")
 
     file_names = ['test_sample_3.pt', 'test_sample_2.pt', 'test_sample_1.pt', 'test_sample_4.pt', 'test_sample_5.pt',
-                  'test_sample_6.pt', 'test_sample_7.pt', 'test_sample_8.pt', 'test_sample_9.pt', 'test_sample_10.pt']
+                  'test_sample_6.pt', 'test_sample_7.pt', 'test_sample_8.pt', 'test_sample_9.pt', 'test_sample_11.pt']
     plot_cosine_similarity_multi_file(
         file_names, activation_type="correct")
     plot_cosine_similarity_multi_file(

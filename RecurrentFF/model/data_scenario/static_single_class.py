@@ -136,7 +136,7 @@ class StaticSingleClassActivityTracker():
                 "data": self.data,
                 "labels": self.labels
             },
-                f"test_sample_{self.tracked_samples}.pt")
+                f"artifacts/activations/test_sample_{self.tracked_samples}.pt")
 
         else:
             logging.warn("Predicted label does not match actual label")
