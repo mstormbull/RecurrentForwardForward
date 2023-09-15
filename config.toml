@@ -2,7 +2,7 @@
 device = "mps"
 
 [model]
-hidden_sizes = [2000, 2000, 2000]
+hidden_sizes = [1000, 1000, 1000]
 epochs = 30000
 prelabel_timesteps = 10
 loss_threshold = 1.5
@@ -16,7 +16,7 @@ interconnect_density = 1
 should_log_metrics = true 
 should_replace_neg_data = false
 should_load_weights = false
-lambda_spectral = 0.001
+lambda_spectral = 0.01
 
 [model.ff_rmsprop]
 momentum = 0.0
