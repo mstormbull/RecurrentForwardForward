@@ -5,6 +5,7 @@ from torch import nn
 from torch.nn import Module
 from torch.nn import functional as F
 from torch.optim import RMSprop, Adam, Adadelta, SGD
+from torchviz import make_dot
 
 from RecurrentFF.util import (
     Activations,
@@ -15,6 +16,18 @@ from RecurrentFF.util import (
 from RecurrentFF.settings import (
     Settings,
 )
+
+POWER_ITERATIONS = 1
+
+
+def compute_spectral_norm(matrix):
+    u = torch.randn(matrix.size(0)).to(matrix.device)
+    v = torch.randn(matrix.size(1)).to(matrix.device)
+    for _ in range(POWER_ITERATIONS):  # typically, a few power iterations are sufficient
+        v = torch.nn.functional.normalize(torch.mv(matrix.t(), u), dim=0)
+        u = torch.nn.functional.normalize(torch.mv(matrix, v), dim=0)
+    sigma = torch.dot(u, torch.mv(matrix, v))
+    return sigma
 
 
 def custom_load_state_dict(self, state_dict, strict=True):
@@ -152,6 +165,15 @@ class HiddenLayer(nn.Module):
 
         self.param_name_dict = {param: name for name,
                                 param in self.named_parameters()}
+
+        l1_max = 0
+        max_expected_loss = 3
+        percentage_contribution_to_loss = 0.1
+        for param in self.param_name_dict:
+            if "weight" in self.param_name_dict[param]:
+                l1_max += param.abs().sum()
+        self.lambda_l1 = (percentage_contribution_to_loss *
+                          max_expected_loss / l1_max).item()
 
     def _apply(self, fn):
         """
@@ -294,15 +316,65 @@ class HiddenLayer(nn.Module):
         pos_badness = layer_activations_to_badness(pos_activations)
         neg_badness = layer_activations_to_badness(neg_activations)
 
+        # # Compute the L1 regularization penalty for all the parameters in the layer
+        # l1_penalty = 0.0
+        # # Assuming you have lambda in settings
+        # lambda_l1 = self.lambda_l1
+        # for params in self.parameters():
+        #     l1_penalty += params.abs().sum()
+
+        # Compute the L1 regularization penalty for all the parameters in the layer
+        l1_penalty = torch.sum(torch.stack([torch.abs(
+            p).sum() for p, name in self.param_name_dict.items() if "weight" in name]))
+
         # Loss function equivelent to:
         # plot3d log(1 + exp(-n + 1)) + log(1 + exp(p - 1)) for n=0 to 3, p=0 to 3
         layer_loss = F.softplus(torch.cat([
             (-1 * neg_badness) + self.settings.model.loss_threshold,
             pos_badness - self.settings.model.loss_threshold
         ])).mean()
-        layer_loss.backward()
+
+        # Compute the spectral norm for the weight matrices
+        # spectral_norm_lateral = 1
+        # spectral_norm_forward = 1
+        # spectral_norm_backward = 1
+
+        spectral_norm_lateral = compute_spectral_norm(
+            self.lateral_linear.weight)
+        spectral_norm_forward = compute_spectral_norm(
+            self.forward_linear.weight)
+        spectral_norm_backward = compute_spectral_norm(
+            self.backward_linear.weight)
+
+        lateral_weights_penalty = self.settings.model.lambda_spectral * \
+            spectral_norm_lateral
+        forward_weights_penalty = self.settings.model.lambda_spectral * \
+            spectral_norm_forward
+        backward_weights_penalty = self.settings.model.lambda_spectral * \
+            spectral_norm_backward
+
+        # Updated Loss: Add the spectral norm penalties
+        # total_loss = (layer_loss + lambda_l1 * l1_penalty +
+        #               lateral_weights_penalty +
+        #               forward_weights_penalty +
+        #               backward_weights_penalty)
+        # total_loss = (layer_loss + l1_penalty * self.lambda_l1)
+        total_loss = (layer_loss + lateral_weights_penalty +
+                      forward_weights_penalty + backward_weights_penalty)
+
+        total_loss.backward()
+
+        # # Visualize computation graph
+        # dot = make_dot(total_loss, params=dict(self.named_parameters()))
+        # dot.format = 'png'
+        # # This will save the graph in PNG format
+        # dot.render(filename="computation_graph")
+
+        # # Wait for user input
+        # input("Press Enter to continue...")
 
         self.optimizer.step()
+
         return layer_loss
 
     def forward(self, mode, data, labels, should_damp):
