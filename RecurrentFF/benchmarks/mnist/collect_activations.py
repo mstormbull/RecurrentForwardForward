@@ -7,7 +7,7 @@ from RecurrentFF.model.model import RecurrentFFNet
 from RecurrentFF.settings import Settings, DataConfig
 
 TEST_BATCH_SIZE = 1
-NUM_BATCHES = 12
+NUM_BATCHES = 1
 
 if __name__ == "__main__":
     settings = Settings.new()
