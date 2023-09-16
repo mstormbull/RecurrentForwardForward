@@ -113,7 +113,7 @@ def plot_cosine_similarity(file_name, activation_type="correct"):
     ]
 
     # Number of layers
-    n_layers = 3
+    n_layers = data["incorrect_lateral_activations"].shape[1]
 
     # Create figure and axes for the cosine similarity plots for each layer
     fig, axes = plt.subplots(n_layers, 2, figsize=(20, 20))
@@ -326,9 +326,12 @@ if __name__ == '__main__':
     # plot_activation_heatmap('test_sample_3.pt', activation_type="correct")
     # plot_activation_heatmap('test_sample_3.pt', activation_type="incorrect")
 
-    file_names = ['test_sample_3.pt', 'test_sample_2.pt', 'test_sample_1.pt', 'test_sample_4.pt', 'test_sample_5.pt',
-                  'test_sample_6.pt', 'test_sample_7.pt', 'test_sample_8.pt', 'test_sample_9.pt', 'test_sample_11.pt']
-    plot_cosine_similarity_multi_file(
-        file_names, activation_type="correct")
-    plot_cosine_similarity_multi_file(
-        file_names, activation_type="incorrect")
+    # file_names = ['test_sample_3.pt', 'test_sample_2.pt', 'test_sample_1.pt', 'test_sample_4.pt', 'test_sample_5.pt',
+    #               'test_sample_6.pt', 'test_sample_7.pt', 'test_sample_8.pt', 'test_sample_9.pt', 'test_sample_11.pt']
+    # plot_cosine_similarity_multi_file(
+    #     file_names, activation_type="correct")
+    # plot_cosine_similarity_multi_file(
+    #     file_names, activation_type="incorrect")
+
+    plot_cosine_similarity('test_sample_2.pt', activation_type="correct")
+    plot_cosine_similarity('test_sample_2.pt', activation_type="incorrect")
