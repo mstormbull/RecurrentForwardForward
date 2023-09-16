@@ -7,6 +7,7 @@ DATASET = "MNIST"
 LABEL_SHOW_BOUNDARY = 10
 NUMBER_FILES = 1
 DIR_PATH = "artifacts/activations"
+DEVICE = "cuda"
 
 
 # Get the first 100 files from the directory
@@ -20,7 +21,7 @@ for i, file in enumerate(files):
     print("processing file", i, "of", len(files))
 
     # Load data
-    data = torch.load(os.path.join(DIR_PATH, file))
+    data = torch.load(os.path.join(DIR_PATH, file), map_location=DEVICE)
 
     # Extract data from the loaded file
     for data_type, label in [("correct", 1), ("incorrect", 0)]:
