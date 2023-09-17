@@ -128,7 +128,8 @@ class HiddenLayer(nn.Module):
             amplified_initialization(self.backward_linear, 3.0)
             # nn.init.orthogonal_(self.backward_linear.weight, gain=math.sqrt(2))
         else:
-            nn.init.orthogonal_(self.backward_linear.weight, gain=math.sqrt(2))
+            amplified_initialization(self.backward_linear, 3.0)
+            # nn.init.orthogonal_(self.backward_linear.weight, gain=math.sqrt(2))
 
         # Initialize the lateral weights to be the identity matrix
         self.lateral_linear = nn.Linear(size, size)
