@@ -87,7 +87,13 @@ class CustomTestDataset(Dataset):
         Returns:
             tuple: A tuple (x, y), where x is the sample data and y is the label.
         """
-        x, y = self.dataset[index]
+        # Retrieve a sample just to get its shape and data type
+        original_x, y = self.dataset[index]
+        x = original_x
+
+        # Generate random noise image with same shape and data type
+        x = torch.rand_like(original_x)
+
         y = torch.tensor(y)
 
         return x, y
@@ -206,7 +212,7 @@ if __name__ == "__main__":
         "train_batch_size": TRAIN_BATCH_SIZE,
         "test_batch_size": TEST_BATCH_SIZE,
         "iterations": ITERATIONS,
-        "dataset": DATASET}
+        "dataset": ""}
 
     if settings.data_config is None:
         settings.data_config = DataConfig(**data_config)
@@ -224,7 +230,7 @@ if __name__ == "__main__":
         # track hyperparameters and run metadata
         config={
             "architecture": "Recurrent-FF",
-            "dataset": DATASET,
+            # "dataset": DATASET,
             "settings": settings.model_dump(),
         }
     )

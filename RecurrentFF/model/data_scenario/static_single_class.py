@@ -54,32 +54,32 @@ class StaticSingleClassActivityTracker():
         self.partial_activations = []
 
     def filter_and_persist(self, predicted_labels, anti_predictions, actual_labels):
-        if predicted_labels == actual_labels:
-            predicted_labels_index = predicted_labels.item()
-            anti_prediction_index = anti_predictions.item()
+        # if predicted_labels == actual_labels:
+        predicted_labels_index = predicted_labels.item()
+        anti_prediction_index = anti_predictions.item()
 
-            correct_activations = self.activations[predicted_labels_index]
-            incorrect_activations = self.activations[anti_prediction_index]
+        correct_activations = self.activations[predicted_labels_index]
+        incorrect_activations = self.activations[anti_prediction_index]
 
-            logging.debug(f"Correct activations: {correct_activations.shape}")
-            logging.debug(
-                f"Incorrect activations: {incorrect_activations.shape}")
-            logging.debug(f"Data: {self.data.shape}")
-            logging.debug(f"Labels: {self.labels.shape}")
+        logging.debug(f"Correct activations: {correct_activations.shape}")
+        logging.debug(
+            f"Incorrect activations: {incorrect_activations.shape}")
+        logging.debug(f"Data: {self.data.shape}")
+        logging.debug(f"Labels: {self.labels.shape}")
 
-            torch.save({
-                "correct_activations": correct_activations,
-                "incorrect_activations": incorrect_activations,
-                "data": self.data,
-                "labels": self.labels
-            },
-                f"test_sample_{self.tracked_samples}.pt")
+        torch.save({
+            "correct_activations": correct_activations,
+            "incorrect_activations": incorrect_activations,
+            "data": self.data,
+            "labels": self.labels
+        },
+            f"artifacts/activations/test_sample_{self.tracked_samples}.pt")
 
-        else:
-            self.activations = []
-            self.partial_activations = []
-            self.data = None
-            self.labels = None
+        # else:
+        #     self.activations = []
+        #     self.partial_activations = []
+        #     self.data = None
+        #     self.labels = None
 
 
 def formulate_incorrect_class(prob_tensor: torch.Tensor,
