@@ -42,7 +42,7 @@ def plot_weights_comparison(forward_weights, backward_weights, lateral_weights, 
 
 
 # Load the weights
-weights = torch.load('weights_9-2.pth')
+weights = torch.load('MNIST_l1_10_pre_10_post_real.pth')
 
 # Number of layers in the network
 layers = len(weights) // 6

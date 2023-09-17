@@ -327,7 +327,7 @@ if __name__ == '__main__':
     plot_activation_heatmap('test_sample_3.pt', activation_type="incorrect")
 
     file_names = ['test_sample_3.pt', 'test_sample_2.pt', 'test_sample_1.pt', 'test_sample_4.pt', 'test_sample_5.pt',
-                  'test_sample_6.pt', 'test_sample_7.pt', 'test_sample_8.pt', 'test_sample_9.pt', 'test_sample_11.pt']
+                  'test_sample_6.pt', 'test_sample_7.pt', 'test_sample_8.pt', 'test_sample_9.pt', 'test_sample_10.pt']
     plot_cosine_similarity_multi_file(
         file_names, activation_type="correct")
     plot_cosine_similarity_multi_file(

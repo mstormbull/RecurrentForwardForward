@@ -7,7 +7,7 @@ from RecurrentFF.model.model import RecurrentFFNet
 from RecurrentFF.settings import Settings, DataConfig
 
 TEST_BATCH_SIZE = 1
-NUM_BATCHES = 1
+NUM_BATCHES = 10
 
 if __name__ == "__main__":
     settings = Settings.new()
@@ -38,7 +38,7 @@ if __name__ == "__main__":
     model = RecurrentFFNet(settings).to(settings.device.device)
 
     model.load_state_dict(torch.load(
-        "MNIST-10-pre-15-post-(more layers)-95%.pth", map_location=settings.device.device))
+        "MNIST_l1_10_pre_10_post_real.pth", map_location=settings.device.device))
 
     model.predict(DataScenario.StaticSingleClass,
                   test_loader, NUM_BATCHES, write_activations=True)

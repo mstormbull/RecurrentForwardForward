@@ -4,9 +4,8 @@ import matplotlib.pyplot as plt
 from numpy.linalg import eig
 
 # Load the weights
-weights = torch.load("weights_9-2.pth")
+weights = torch.load("MNIST_l1_10_pre_10_post_real.pth")
 
-matrix_size = 6000
 layers = 3
 
 # 1. Extract the lateral connectivity matrices from the weights.
@@ -16,11 +15,17 @@ for i in range(layers):
     lateral_matrix = np.abs(weights[recurrent_key].detach().cpu().numpy())
     lateral_matrices.append(lateral_matrix)
 
+print("about to compute eig")
+
 # 2. Compute the eigenvalues of these matrices.
 eigenvalues_list = [eig(matrix)[0] for matrix in lateral_matrices]
 
+print("about to analyze eig")
+
 # 3. Analyze the real parts of the eigenvalues to determine the stability of the system.
 for idx, eigenvalues in enumerate(eigenvalues_list):
+    print(f"Eigenvalues for Lateral Matrix {idx+1}:")
+
     unstable_modes = np.sum(np.real(eigenvalues) > 1)
     print(f"For lateral matrix {idx+1}:")
     print(

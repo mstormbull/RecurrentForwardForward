@@ -91,18 +91,18 @@ def plot_density_function(weights, layer_idx):
 
 
 # Assuming you're using the same loading code as before
-weights = torch.load("weights_9-2.pth")
+weights = torch.load("MNIST_l1_10_pre_10_post_real.pth")
 layers = len(weights) // 6
 
-# for i in range(layers):
-#     plot_density_function(weights, i)
+for i in range(layers):
+    plot_density_function(weights, i)
 
 
 # Get global min and max values for consistent scale
 vmin, vmax = get_global_min_max(weights, layers)
-scaling_factor = 6
-vmin = vmin // scaling_factor
-vmax = vmax // scaling_factor
+scaling_factor = 10
+vmin = vmin / scaling_factor
+vmax = vmax / scaling_factor
 
 # Plot the heatmaps
 for i in range(layers):

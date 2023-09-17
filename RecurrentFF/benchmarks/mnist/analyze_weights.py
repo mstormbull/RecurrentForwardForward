@@ -89,17 +89,17 @@ def plot_weight_magnitude_histogram(all_weights):
 
 
 if __name__ == "__main__":
-    weights = torch.load("weights_9-2.pth")
+    weights = torch.load("MNIST_l1_10_pre_10_post_real.pth")
 
     for element in weights:
         print(element)
 
-    adjacency_matrix = np.zeros((6000, 6000))
+    adjacency_matrix = np.zeros((3000, 3000))
 
     layers = 3
     for i in range(layers):
-        start_idx = i * 2000
-        end_idx = (i + 1) * 2000
+        start_idx = i * 1000
+        end_idx = (i + 1) * 1000
 
         backward_key = f"inner_layers.layers.{i}.forward_linear.weight"
         recurrent_key = f"inner_layers.layers.{i}.lateral_linear.weight"
@@ -107,8 +107,8 @@ if __name__ == "__main__":
 
         # backward weights
         if i != layers - 1:
-            adjacency_matrix[start_idx:end_idx, start_idx + 2000:end_idx +
-                             2000] = np.abs(weights[forward_key].detach().cpu().numpy())
+            adjacency_matrix[start_idx:end_idx, start_idx + 1000:end_idx +
+                             1000] = np.abs(weights[forward_key].detach().cpu().numpy())
 
         # recurrent weights
         adjacency_matrix[start_idx:end_idx, start_idx:end_idx] = np.abs(
@@ -116,14 +116,14 @@ if __name__ == "__main__":
 
         # forward weights
         if i != 0:
-            adjacency_matrix[start_idx:end_idx, start_idx - 2000:end_idx -
-                             2000] = np.abs(weights[backward_key].detach().cpu().numpy())
+            adjacency_matrix[start_idx:end_idx, start_idx - 1000:end_idx -
+                             1000] = np.abs(weights[backward_key].detach().cpu().numpy())
 
     # Flatten the adjacency matrix to get all weights as a 1D array
     all_weights = adjacency_matrix.flatten()
 
     # Find the threshold corresponding to the 25th percentile
-    percent = 35
+    percent = 94
     threshold = np.percentile(all_weights, percent)
 
     # Print the threshold

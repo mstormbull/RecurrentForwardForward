@@ -7,7 +7,7 @@ DATASET = "MNIST"
 LABEL_SHOW_BOUNDARY = 10
 NUMBER_FILES = 1
 DIR_PATH = "artifacts/activations"
-DEVICE = "cuda"
+DEVICE = "mps"
 
 
 # Get the first 100 files from the directory
