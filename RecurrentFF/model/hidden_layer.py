@@ -120,8 +120,7 @@ class HiddenLayer(nn.Module):
         self.reset_activations(True)
 
         self.forward_linear = nn.Linear(prev_size, size)
-        nn.init.kaiming_uniform_(
-            self.forward_linear.weight, nonlinearity='relu')
+        nn.init.orthogonal_(self.forward_linear.weight, gain=math.sqrt(2))
 
         self.backward_linear = nn.Linear(next_size, size)
 
@@ -132,7 +131,8 @@ class HiddenLayer(nn.Module):
 
         # Initialize the lateral weights to be the identity matrix
         self.lateral_linear = nn.Linear(size, size)
-        nn.init.orthogonal_(self.lateral_linear.weight, gain=math.sqrt(2))
+        nn.init.eye_(self.lateral_linear.weight)
+        # nn.init.orthogonal_(self.lateral_linear.weight, gain=math.sqrt(2))
 
         self.previous_layer = None
         self.next_layer = None
