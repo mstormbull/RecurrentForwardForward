@@ -8,8 +8,8 @@ import matplotlib.pyplot as plt
 ACTIVATIONS_DIR = "./artifacts/activations/"
 NUM_LAYERS = 3
 NUM_NEURONS_PER_LAYER = 2000
-NUM_NEURONS_TO_ANALYZE = 100
-FILE_LIMIT = 1000
+NUM_NEURONS_TO_ANALYZE = 500
+FILE_LIMIT = 10000
 
 
 def enhance_and_visualize(image_path):
@@ -96,12 +96,12 @@ for filename in files:
     for layer, neuron in random_neurons:
         mean, std_dev = neuron_to_mean_std_dev[(layer, neuron)]
         threshold = mean + std_dev * 3
-        print(f"threshold: {threshold}")
+        # print(f"threshold: {threshold}")
         threshold = threshold
         for timestep in range(activations.shape[0]):
             if activations[timestep, layer, neuron] > threshold:
-                print(
-                    f"activations[timestep, layer, neuron]: {activations[timestep, layer, neuron]}")
+                # print(
+                #     f"activations[timestep, layer, neuron]: {activations[timestep, layer, neuron]}")
                 neuron_to_images[(layer, neuron)].append(image)
                 break  # Once an image is added for a neuron, no need to check other timesteps for the same image
 
