@@ -181,6 +181,8 @@ class RecurrentFFNet(nn.Module):
                     total_batch_count
                 )
 
+            self.inner_layers.step_learning_rates()
+
     def __train_batch(self, batch_num, input_data, label_data, total_batch_count):
         logging.info("Batch: " + str(batch_num))
 
