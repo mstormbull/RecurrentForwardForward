@@ -12,6 +12,8 @@ OUTPUT_ACTIVATION_LIMIT_UPPER = 8
 
 BASE_PT_PATH = "./artifacts/activations"
 
+LAYERS = 5
+
 
 def plot_cosine_similarity_multi_file(file_names, activation_type="correct"):
     # Initialize the activation accumulator
@@ -255,24 +257,31 @@ def plot_activation_heatmap(file_name, activation_type="correct"):
 
     # Create figure and axes for the 6 subplots for n layers (1 additional
     # subplot for the combined activations)
-    fig, axes = plt.subplots(6, 3, figsize=(30, 30))
+    fig, axes = plt.subplots(6, LAYERS, figsize=(30, 30))
 
     activations_names = ['forward', 'backward', 'lateral']
 
     # Plotting the heatmaps for the 3 activations
     for idx, activation in enumerate(activations_names):
-        for layer in range(3):
+        for layer in range(LAYERS):
             activation_key = f'{activation_type}_{activation}_activations'
             activation_data = data[activation_key][:, layer, :].cpu().numpy()
             ax = axes[idx, layer]
+
+            vmin = -50
+            vmax = 30
+            if "lateral" in activation_key.lower():
+                vmin = -10
+                vmax = 10
+
             cax = ax.imshow(
                 activation_data,
                 aspect='auto',
                 cmap='viridis',
                 interpolation='nearest',
                 origin='lower',
-                vmin=-50,
-                vmax=30)
+                vmin=vmin,
+                vmax=vmax)
             fig.colorbar(cax, ax=ax)
             ax.set_title(
                 f'{activation.capitalize()} Activations for Layer {layer} in {file_name}')
@@ -280,7 +289,7 @@ def plot_activation_heatmap(file_name, activation_type="correct"):
             ax.set_ylabel('Timesteps')
 
     # Plotting the heatmap for the actual combined activations
-    for layer in range(3):
+    for layer in range(LAYERS):
         actual_combined = torch.abs(
             data[f'{activation_type}_activations'][:, layer, :]).cpu().numpy()
         ax = axes[5, layer]
@@ -299,7 +308,7 @@ def plot_activation_heatmap(file_name, activation_type="correct"):
         ax.set_ylabel('Timesteps')
 
     # Compute and plot the summed activations for each layer
-    for layer in range(3):
+    for layer in range(LAYERS):
         summed_activations = (
             data[f'{activation_type}_forward_activations'] +
             data[f'{activation_type}_backward_activations'] +
