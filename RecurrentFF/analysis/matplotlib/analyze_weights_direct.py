@@ -3,6 +3,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 
+LAYERS = 5
+
 
 def plot_correlation_heatmap(correlation_matrix, layer):
     """
@@ -20,7 +22,12 @@ def plot_correlation_heatmap(correlation_matrix, layer):
     plt.close()
 
 
-def plot_weights_comparison(forward_weights, backward_weights, lateral_weights, neuron_idx, layer):
+def plot_weights_comparison(
+        forward_weights,
+        backward_weights,
+        lateral_weights,
+        neuron_idx,
+        layer):
     """
     Plot the weights comparison for a specific neuron in a given layer.
     """
@@ -42,16 +49,13 @@ def plot_weights_comparison(forward_weights, backward_weights, lateral_weights, 
 
 
 # Load the weights
-weights = torch.load('weights_9-2.pth')
-
-# Number of layers in the network
-layers = len(weights) // 6
+weights = torch.load('IdentityMoneyball.pth', map_location=torch.device('cpu'))
 
 # Perform the analyses for each layer
-for layer in range(layers):
+for layer in range(LAYERS):
     forward_key = f'inner_layers.layers.{layer}.forward_linear.weight'
     backward_key = f'inner_layers.layers.{layer}.backward_linear.weight'
-    lateral_key = f'inner_layers.layers.{layer}.lateral_linear.weight'
+    lateral_key = f'inner_layers.layers.{layer}.lateral_linear.parametrizations.weight.original'
 
     # Extract the weights for the current layer
     forward_weights_layer = weights[forward_key].cpu().numpy()
@@ -81,6 +85,11 @@ for layer in range(layers):
     plot_correlation_heatmap(correlation_matrix, layer)
 
     # For Direct Comparison
-    # Plot the weights comparison for a sample neuron (e.g., neuron 0) in the current layer
+    # Plot the weights comparison for a sample neuron (e.g., neuron 0) in the
+    # current layer
     plot_weights_comparison(
-        forward_weights_layer, backward_weights_layer, lateral_weights_layer, 0, layer)
+        forward_weights_layer,
+        backward_weights_layer,
+        lateral_weights_layer,
+        0,
+        layer)
