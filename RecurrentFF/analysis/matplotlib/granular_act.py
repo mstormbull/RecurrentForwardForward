@@ -146,11 +146,16 @@ def plot_cosine_similarity(file_name, activation_type="correct"):
                     data2 = data[f'{activation_type}_{act2}_activations'][:, layer, :].cpu(
                     )
 
+                all_data = np.concatenate([data1, data2], axis=0)
+                pca = PCA(n_components=5).fit(all_data)
+                data1_projected = pca.transform(data1)
+                data2_projected = pca.transform(data2)
+
                 # Compute cosine similarity for each time step
                 cos_sim = [
                     cosine_similarity(
-                        data1[i].unsqueeze(0),
-                        data2[i].unsqueeze(0))[0][0] for i in range(
+                        data1_projected[i].reshape(1, -1),
+                        data2_projected[i].reshape(1, -1))[0][0] for i in range(
                         data1.size(0))]
 
                 ax.plot(cos_sim, label=f'Cosine Similarity: {act1} :: {act2}')
