@@ -32,34 +32,86 @@ class StaticSingleClassActivityTracker():
     def __init__(self):
         self.data = None
         self.labels = None
+
         self.activations = []
+        self.forward_activations = []
+        self.backward_activations = []
+        self.lateral_activations = []
+
         self.partial_activations = []
+        self.partial_forward_activations = []
+        self.partial_backward_activations = []
+        self.partial_lateral_activations = []
+
         self.tracked_samples = 0
 
     def reinitialize(self, data, labels):
         self.data = data[0][0]  # first batch, first timestep
         self.labels = labels.squeeze(1)
+
         self.activations = []
+        self.forward_activations = []
+        self.backward_activations = []
+        self.lateral_activations = []
+
         self.partial_activations = []
+        self.partial_forward_activations = []
+        self.partial_backward_activations = []
+        self.partial_lateral_activations = []
+
         self.tracked_samples += 1
 
     def track_partial_activations(self, layers: InnerLayers):
         build = []
+        build_forward = []
+        build_backward = []
+        build_lateral = []
         for layer in layers:
             build.append(layer.predict_activations.current)
+            build_forward.append(layer.forward_act)
+            build_backward.append(layer.backward_act)
+            build_lateral.append(layer.lateral_act)
+
         self.partial_activations.append(torch.stack(build).squeeze(1))
+        self.partial_forward_activations.append(
+            torch.stack(build_forward).squeeze(1))
+        self.partial_backward_activations.append(
+            torch.stack(build_backward).squeeze(1))
+        self.partial_lateral_activations.append(
+            torch.stack(build_lateral).squeeze(1))
 
     def cut_activations(self):
         self.activations.append(torch.stack(self.partial_activations))
-        self.partial_activations = []
+        self.forward_activations.append(
+            torch.stack(self.partial_forward_activations))
+        self.backward_activations.append(
+            torch.stack(self.partial_backward_activations))
+        self.lateral_activations.append(
+            torch.stack(self.partial_lateral_activations))
 
-    def filter_and_persist(self, predicted_labels, anti_predictions, actual_labels):
+        self.partial_activations = []
+        self.partial_forward_activations = []
+        self.partial_backward_activations = []
+        self.partial_lateral_activations = []
+
+    def filter_and_persist(
+            self,
+            predicted_labels,
+            anti_predictions,
+            actual_labels):
         if predicted_labels == actual_labels:
             predicted_labels_index = predicted_labels.item()
             anti_prediction_index = anti_predictions.item()
 
             correct_activations = self.activations[predicted_labels_index]
+            correct_forward_activations = self.forward_activations[predicted_labels_index]
+            correct_backward_activations = self.backward_activations[predicted_labels_index]
+            correct_lateral_activations = self.lateral_activations[predicted_labels_index]
+
             incorrect_activations = self.activations[anti_prediction_index]
+            incorrect_forward_activations = self.forward_activations[anti_prediction_index]
+            incorrect_backward_activations = self.backward_activations[anti_prediction_index]
+            incorrect_lateral_activations = self.lateral_activations[anti_prediction_index]
 
             logging.debug(f"Correct activations: {correct_activations.shape}")
             logging.debug(
@@ -69,15 +121,30 @@ class StaticSingleClassActivityTracker():
 
             torch.save({
                 "correct_activations": correct_activations,
+                "correct_forward_activations": correct_forward_activations,
+                "correct_backward_activations": correct_backward_activations,
+                "correct_lateral_activations": correct_lateral_activations,
                 "incorrect_activations": incorrect_activations,
+                "incorrect_forward_activations": incorrect_forward_activations,
+                "incorrect_backward_activations": incorrect_backward_activations,
+                "incorrect_lateral_activations": incorrect_lateral_activations,
                 "data": self.data,
                 "labels": self.labels
             },
                 f"artifacts/activations/test_sample_{self.tracked_samples}.pt")
 
         else:
+            logging.warn("Predicted label does not match actual label")
             self.activations = []
+            self.forward_activations = []
+            self.backward_activations = []
+            self.lateral_activations = []
+
             self.partial_activations = []
+            self.partial_forward_activations = []
+            self.partial_backward_activations = []
+            self.partial_lateral_activations = []
+
             self.data = None
             self.labels = None
 
@@ -180,7 +247,10 @@ class StaticSingleClassProcessor(DataScenarioProcessor):
                 lr=self.settings.model.classifier_adadelta.learning_rate)
 
     def train_class_predictor_from_latents(
-            self, latents: torch.Tensor, labels: torch.Tensor, total_batch_count: int):
+            self,
+            latents: torch.Tensor,
+            labels: torch.Tensor,
+            total_batch_count: int):
         """
         Trains the classification model using the given latent vectors and
         corresponding labels.
@@ -244,7 +314,10 @@ class StaticSingleClassProcessor(DataScenarioProcessor):
         class_logits = F.linear(latents, self.classification_weights.weight)
         class_probabilities = F.softmax(class_logits, dim=-1)
         negative_labels = formulate_incorrect_class(
-            class_probabilities, input_labels.pos_labels[0], self.settings, total_batch_count)
+            class_probabilities,
+            input_labels.pos_labels[0],
+            self.settings,
+            total_batch_count)
 
         frames = input_labels.pos_labels.shape[0]
         negative_labels = negative_labels.unsqueeze(
@@ -252,7 +325,12 @@ class StaticSingleClassProcessor(DataScenarioProcessor):
         input_labels.neg_labels = negative_labels.repeat(
             frames, 1, 1)  # Repeat along the new dimension
 
-    def brute_force_predict(self, loader, limit_batches=None, is_test_set=False, write_activations=False):
+    def brute_force_predict(
+            self,
+            loader,
+            limit_batches=None,
+            is_test_set=False,
+            write_activations=False):
         """
         This function predicts the class labels for the provided test data using
         the trained RecurrentFFNet model. It does so by enumerating all possible
@@ -309,7 +387,8 @@ class StaticSingleClassProcessor(DataScenarioProcessor):
                 if write_activations:
                     activity_tracker.reinitialize(data, labels)
 
-                # since this is static singleclass we can use the first frame for the label
+                # since this is static singleclass we can use the first frame
+                # for the label
                 labels = labels[0]
 
                 iterations = data.shape[0]
@@ -323,7 +402,8 @@ class StaticSingleClassProcessor(DataScenarioProcessor):
                     upper_clamped_tensor = self.get_preinit_upper_clamped_tensor(
                         (data.shape[1], self.settings.data_config.num_classes))
 
-                    for _preinit_step in range(0, self.settings.model.prelabel_timesteps):
+                    for _preinit_step in range(
+                            0, self.settings.model.prelabel_timesteps):
                         self.inner_layers.advance_layers_forward(
                             forward_mode, data[0], upper_clamped_tensor, False)
                         if write_activations:
@@ -407,9 +487,12 @@ class StaticSingleClassProcessor(DataScenarioProcessor):
 
         return accuracy
 
-    def get_preinit_upper_clamped_tensor(self, upper_clamped_tensor_shape: tuple):
-        labels = torch.full(upper_clamped_tensor_shape, 1.0 / self.settings.data_config.num_classes,
-                            device=self.settings.device.device)
+    def get_preinit_upper_clamped_tensor(
+            self, upper_clamped_tensor_shape: tuple):
+        labels = torch.full(
+            upper_clamped_tensor_shape,
+            1.0 / self.settings.data_config.num_classes,
+            device=self.settings.device.device)
         return labels
 
     def __retrieve_latents__(
