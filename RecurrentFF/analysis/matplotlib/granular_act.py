@@ -98,7 +98,7 @@ def plot_cosine_similarity_multi_file(file_names, activation_type="correct"):
     # Finalizing the plots
     plt.tight_layout()
     plt.savefig(
-        f"img/activation_cancellations/cos_similarity_{activation_type}_average.png")
+        f"img/debug/activation_cancellations/cos_similarity_{activation_type}_average.png")
 
 
 def plot_cosine_similarity(file_name, activation_type="correct"):
@@ -169,7 +169,7 @@ def plot_cosine_similarity(file_name, activation_type="correct"):
     # Finalizing the plots
     plt.tight_layout()
     plt.savefig(
-        f"img/activation_cancellations/cos_similarity_{activation_type}_{file_name.replace('.pt', '')}.png")
+        f"img/debug/activation_cancellations/cos_similarity_{activation_type}_{file_name.replace('.pt', '')}.png")
 
 
 def plot_l2_norm_across_time(file_name, activation_type="correct"):
@@ -253,7 +253,7 @@ def plot_l2_norm_across_time(file_name, activation_type="correct"):
     # Finalizing the plots
     plt.tight_layout()
     plt.savefig(
-        f"img/activation_cancellations/l2_and_mean_{activation_type}_{file_name.replace('.pt', '')}.png")
+        f"img/debug/activation_cancellations/l2_and_mean_{activation_type}_{file_name.replace('.pt', '')}.png")
 
 
 def plot_activation_heatmap(file_name, activation_type="correct"):
@@ -365,7 +365,7 @@ def plot_activation_heatmap(file_name, activation_type="correct"):
     # Finalizing the plots
     plt.tight_layout()
     plt.savefig(
-        f"img/activation_cancellations/heatmap_{activation_type}_{file_name.replace('.pt', '')}.png")
+        f"img/debug/activation_cancellations/heatmap_{activation_type}_{file_name.replace('.pt', '')}.png")
 
 
 if __name__ == '__main__':

@@ -18,7 +18,7 @@ def plot_correlation_heatmap(correlation_matrix, layer):
     plt.yticks(ticks=[0.5, 1.5, 2.5], labels=[
                'Forward', 'Backward', 'Lateral'])
     plt.tight_layout()
-    plt.savefig(f'img/weight_cancellations/Correlation_Layer_{layer}.png')
+    plt.savefig(f'img/debug/weight_cancellations/Correlation_Layer_{layer}.png')
     plt.close()
 
 
@@ -44,7 +44,7 @@ def plot_weights_comparison(
     plt.grid(axis='y', linestyle='--')
     plt.tight_layout()
     plt.savefig(
-        f'img/weight_cancellations/Comparison_Neuron_{neuron_idx}_Layer_{layer}.png')
+        f'img/debug/weight_cancellations/Comparison_Neuron_{neuron_idx}_Layer_{layer}.png')
     plt.close()
 
 

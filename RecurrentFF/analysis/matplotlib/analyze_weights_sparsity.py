@@ -33,7 +33,7 @@ def plot_heatmap(weights, layer_idx, vmin, vmax):
         plt.ylabel('Neurons')
         plt.tight_layout()
         plt.savefig(
-            f"img/weight_heatmaps/layer_{layer_idx}_{name}_heatmap.png")
+            f"img/debug/weight_heatmaps/layer_{layer_idx}_{name}_heatmap.png")
 
 
 def get_global_min_max(weights, layers):
@@ -89,7 +89,7 @@ def plot_density_function(weights, layer_idx):
     plt.grid(True, which='both', linestyle='--', linewidth=0.5)
     plt.tight_layout()
     plt.savefig(
-        f"img/weight_sparsities/layer_{layer_idx}_density_function.png")
+        f"img/debug/weight_sparsities/layer_{layer_idx}_density_function.png")
 
 
 # Assuming you're using the same loading code as before

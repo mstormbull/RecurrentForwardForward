@@ -15,7 +15,7 @@ def plot_summed_weights(summed_weights, layer):
     plt.ylabel('Number of Neurons')
     plt.grid(axis='y', linestyle='--')
     plt.tight_layout()
-    plt.savefig(f'img/weight_cancellations/Summed_Weights_Layer_{layer}.png')
+    plt.savefig(f'img/debug/weight_cancellations/Summed_Weights_Layer_{layer}.png')
     plt.close()
 
 

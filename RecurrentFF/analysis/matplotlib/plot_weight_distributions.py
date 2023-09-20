@@ -15,7 +15,7 @@ def plot_weight_distributions(weights_list, labels, title):
     plt.legend(loc='upper right')
     plt.grid(axis='y', linestyle='--')
     plt.tight_layout()
-    plt.savefig(f'img/weight_distributions/{title}.png')
+    plt.savefig(f'img/debug/weight_distributions/{title}.png')
     plt.close()
 
 

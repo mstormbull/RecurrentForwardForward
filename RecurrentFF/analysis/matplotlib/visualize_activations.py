@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 BASE_INPUT_PATH = "./artifacts/activations"
-BASE_OUT_PATH = "./img/activation_heatmaps"
+BASE_OUT_PATH = "./img/debug/activation_heatmaps"
 SCENARIOS = ["incorrect_activations", "correct_activations"]
 FILENAMES = ["test_sample_1.pt", "test_sample_2.pt", "test_sample_3.pt"]
 
