@@ -39,4 +39,4 @@ for idx, eigenvalues in enumerate(eigenvalues_list):
     plt.xlabel('Real Part')
     plt.ylabel('Imaginary Part')
     plt.grid(True)
-    plt.savefig(f"img/weight_distributions/eigenvalues_layer_{idx+1}.png")
+    plt.savefig(f"img/debug/weight_distributions/eigenvalues_layer_{idx+1}.png")
