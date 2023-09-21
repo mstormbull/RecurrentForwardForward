@@ -160,7 +160,8 @@ class HiddenLayer(nn.Module):
 
         # Initialize the lateral weights to be the identity matrix
         self.lateral_linear = nn.Linear(size, size)
-        perturbed_identity_init(self.lateral_linear.weight)
+        # perturbed_identity_init(self.lateral_linear.weight)
+        _custom_init(self.lateral_linear.weight, settings)
         self.lateral_linear = torch.nn.utils.parametrizations.spectral_norm(
             self.lateral_linear)
 
@@ -184,8 +185,23 @@ class HiddenLayer(nn.Module):
         self.param_name_dict = {param: name for name,
                                 param in self.named_parameters()}
 
+        l2_max = 0
+        max_expected_loss = 4
+        percentage_contribution_to_loss = 0.001
+        for param in self.param_name_dict:
+            if "forward" in self.param_name_dict[param] and "weight" in self.param_name_dict[param]:
+                l2_max += torch.norm(param).item()
+            elif "backward" in self.param_name_dict[param] and "weight" in self.param_name_dict[param]:
+                l2_max += torch.norm(param).item()
+
+        # for param in self.param_name_dict:
+        #     if "weight" in self.param_name_dict["lateral_linear.parametrizations.weight.original"]:
+        #         l2_max += param.abs().sum() ** 2
+        self.lambda_l2 = (percentage_contribution_to_loss *
+                          max_expected_loss / l2_max)
+
     def step_learning_rate(self):
-        self.scheduler.step()
+        # self.scheduler.step()
         pass
 
     def _apply(self, fn):
@@ -329,6 +345,16 @@ class HiddenLayer(nn.Module):
         pos_badness = layer_activations_to_badness(pos_activations)
         neg_badness = layer_activations_to_badness(neg_activations)
 
+        l2_penalty = 0
+        for param in self.param_name_dict:
+            if "forward" in self.param_name_dict[param] and "weight" in self.param_name_dict[param]:
+                l2_penalty += torch.norm(param)
+            elif "backward" in self.param_name_dict[param] and "weight" in self.param_name_dict[param]:
+                l2_penalty += torch.norm(param)
+
+        # torch.sum(torch.stack([torch.abs(
+        #     p).sum() for p, name in self.param_name_dict.items() if "weight" in name]))
+
         # Loss function equivelent to:
         # plot3d log(1 + exp(-n + 1)) + log(1 + exp(p - 1)) for n=0 to 3, p=0
         # to 3
@@ -336,7 +362,8 @@ class HiddenLayer(nn.Module):
             (-1 * neg_badness) + self.settings.model.loss_threshold,
             pos_badness - self.settings.model.loss_threshold
         ])).mean()
-        layer_loss.backward()
+        total_loss = layer_loss + self.lambda_l2 * l2_penalty
+        total_loss.backward()
 
         self.optimizer.step()
         return layer_loss
