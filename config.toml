@@ -1,5 +1,5 @@
 [device]
-device = "cuda"
+device = "mps"
 
 [model]
 hidden_sizes = [700, 700, 700, 700, 700]
@@ -23,7 +23,7 @@ learning_rate = 0.00001
 
 [model.classifier_rmsprop]
 momentum = 0
-learning_rate = 0.00001
+learning_rate = 0.0001
 
 [model.ff_adam]
 learning_rate = 0.00001
