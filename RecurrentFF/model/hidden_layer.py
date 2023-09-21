@@ -75,6 +75,10 @@ def amplified_initialization(layer: nn.Linear, amplification_factor=3.0):
     # Initialize weights with amplified standard deviation
     nn.init.normal_(layer.weight, mean=0, std=amplified_std)
 
+def perturbed_identity_init(weight, scale=0.05):
+    identity = torch.eye(weight.shape[0], weight.shape[1]).to(weight.device)
+    random_perturbation = torch.randn_like(weight) * scale
+    weight.data = identity + random_perturbation
 
 def _custom_init(weight, settings, gain=1):
     # Initialize with orthogonal matrix
@@ -154,7 +158,7 @@ class HiddenLayer(nn.Module):
 
         # Initialize the lateral weights to be the identity matrix
         self.lateral_linear = nn.Linear(size, size)
-        _custom_init(self.lateral_linear.weight, settings)
+        perturbed_identity_init(self.lateral_linear.weight)
         self.lateral_linear = torch.nn.utils.parametrizations.spectral_norm(
             self.lateral_linear)
 
@@ -179,7 +183,8 @@ class HiddenLayer(nn.Module):
                                 param in self.named_parameters()}
 
     def step_learning_rate(self):
-        self.scheduler.step()
+        # self.scheduler.step()
+        pass
 
     def _apply(self, fn):
         """
