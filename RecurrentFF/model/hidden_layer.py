@@ -63,6 +63,26 @@ def custom_load_state_dict(self, state_dict, strict=True):
     return self
 
 
+def _custom_init(weight, settings, gain=1):
+    # Initialize with orthogonal matrix
+    nn.init.orthogonal_(weight, gain=gain)
+
+    # Initialize with identity matrix
+    identity = torch.eye(weight.shape[0], weight.shape[1])
+
+    # Ensure identity matrix is on the same device as weight
+    identity = identity
+
+    # Combine the orthogonal and identity matrices
+    weight.data = 0.7 * weight.data + 0.7 * identity
+
+
+def perturbed_identity_init(weight, scale=0.05):
+    identity = torch.eye(weight.shape[0], weight.shape[1]).to(weight.device)
+    random_perturbation = torch.randn_like(weight) * scale
+    weight.data = identity + random_perturbation
+
+
 def amplified_initialization(layer: nn.Linear, amplification_factor=3.0):
     """Amplified initialization for Linear layers."""
     # Get the number of input features
@@ -300,6 +320,17 @@ class HiddenLayer(nn.Module):
 
         pos_badness = layer_activations_to_badness(pos_activations)
         neg_badness = layer_activations_to_badness(neg_activations)
+        # print("neg activations: ")
+        # print(neg_activations[10])
+        # print("neg badness: ")
+        # print(neg_badness)
+        # print("pos activations: ")
+        # print(pos_activations[10])
+        # print("pos badness: ")
+        # print(pos_badness)
+        # print()
+        # print()
+        # input()
 
         # Loss function equivelent to:
         # plot3d log(1 + exp(-n + 1)) + log(1 + exp(p - 1)) for n=0 to 3, p=0
@@ -307,8 +338,17 @@ class HiddenLayer(nn.Module):
         layer_loss = F.softplus(torch.cat([
             (-1 * neg_badness) + self.settings.model.loss_threshold,
             pos_badness - self.settings.model.loss_threshold
-        ])).mean()
+        ]))
+        # print("layer_loss: ")
+        # print(layer_loss)
+
+        layer_loss = layer_loss.mean()
         layer_loss.backward()
+
+        # print("pos_badness: ", pos_badness.mean())
+        # print("neg_badness: ", neg_badness.mean())
+        # print("layer_loss: ", layer_loss.item())
+        # print()
 
         self.optimizer.step()
         return layer_loss
@@ -513,9 +553,9 @@ class HiddenLayer(nn.Module):
             self.backward_act = backward
             self.lateral_act = lateral
 
-        summation = self.forward + self.backward + self.lateral
-        summation = torch.clamp(summation, min=0, max=5)
-        new_activation = F.sigmoid(summation)
+        summation = self.forward_act - self.backward_act + self.lateral_act
+        # summation = torch.clamp(summation, min=-5, max=5)
+        new_activation = F.leaky_relu(summation)
 
         if should_damp:
             old_activation = new_activation
