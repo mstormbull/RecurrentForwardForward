@@ -408,6 +408,10 @@ class HiddenLayer(nn.Module):
                 prev_act_stdized,
                 self.lateral_linear.weight)
 
+            self.forward_act = forward
+            self.backward_act = backward
+            self.lateral_act = lateral
+
         # Single layer scenario. Hidden layer connected to input layer and
         # output layer.
         elif data is not None and labels is not None:
@@ -432,6 +436,10 @@ class HiddenLayer(nn.Module):
             lateral = F.linear(
                 prev_act_stdized,
                 self.lateral_linear.weight)
+
+            self.forward_act = forward
+            self.backward_act = backward
+            self.lateral_act = lateral
 
         # Input layer scenario. Connected to input layer and hidden layer.
         elif data is not None:
@@ -465,6 +473,10 @@ class HiddenLayer(nn.Module):
                 prev_act_stdized,
                 self.lateral_linear.weight)
 
+            self.forward_act = forward
+            self.backward_act = backward
+            self.lateral_act = lateral
+
         # Output layer scenario. Connected to hidden layer and output layer.
         elif labels is not None:
             prev_layer_prev_timestep_activations = None
@@ -497,11 +509,11 @@ class HiddenLayer(nn.Module):
                 prev_act_stdized,
                 self.lateral_linear.weight)
 
-        self.forward_act = forward
-        self.backward_act = backward
-        self.lateral_act = lateral
+            self.forward_act = forward
+            self.backward_act = backward
+            self.lateral_act = lateral
 
-        summation = forward + backward + lateral
+        summation = self.forward + self.backward + self.lateral
         summation = torch.clamp(summation, min=0, max=5)
         new_activation = F.sigmoid(summation)
 
