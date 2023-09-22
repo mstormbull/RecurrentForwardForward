@@ -158,7 +158,7 @@ class HiddenLayer(nn.Module):
 
         # Initialize the lateral weights to be the identity matrix
         self.lateral_linear = nn.Linear(size, size)
-        perturbed_identity_init(self.lateral_linear.weight)
+        _custom_init(self.lateral_linear.weight, self.settings)
         self.lateral_linear = torch.nn.utils.parametrizations.spectral_norm(
             self.lateral_linear)
 
@@ -438,6 +438,7 @@ class HiddenLayer(nn.Module):
             self.lateral_act = lateral
 
             new_activation = F.leaky_relu(forward + backward + lateral)
+            new_activation = torch.clamp(new_activation, min=-5, max=5)
             # print(
             #     f"no relu: {(forward + backward + lateral).flatten().mean()}")
             # print(f"relu: {new_activation.flatten().mean()}")
@@ -477,6 +478,7 @@ class HiddenLayer(nn.Module):
             self.lateral_act = lateral
 
             new_activation = F.leaky_relu(forward + backward + lateral)
+            new_activation = torch.clamp(new_activation, min=-5, max=5)
 
             if should_damp:
                 old_activation = new_activation
@@ -520,6 +522,7 @@ class HiddenLayer(nn.Module):
             self.lateral_act = lateral
 
             new_activation = F.leaky_relu(forward + backward + lateral)
+            new_activation = torch.clamp(new_activation, min=-5, max=5)
 
             if should_damp:
                 old_activation = new_activation
@@ -563,6 +566,7 @@ class HiddenLayer(nn.Module):
             self.lateral_act = lateral
 
             new_activation = F.leaky_relu(forward + backward + lateral)
+            new_activation = torch.clamp(new_activation, min=-5, max=5)
 
             if should_damp:
                 old_activation = new_activation
