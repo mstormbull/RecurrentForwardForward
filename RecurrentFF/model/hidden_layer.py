@@ -151,7 +151,6 @@ class HiddenLayer(nn.Module):
             self.forward_linear.weight, nonlinearity='relu')
 
         self.backward_linear = nn.Linear(next_size, size)
-
         if next_size == self.settings.data_config.num_classes:
             amplified_initialization(self.backward_linear, 3.0)
         else:
@@ -160,7 +159,8 @@ class HiddenLayer(nn.Module):
         # Initialize the lateral weights to be the identity matrix
         self.lateral_linear = nn.Linear(size, size)
         # nn.init.orthogonal_(self.lateral_linear.weight, gain=math.sqrt(2))
-        perturbed_identity_init(self.lateral_linear.weight)
+        _custom_init(self.lateral_linear.weight, settings)
+
 
         self.previous_layer = None
         self.next_layer = None
@@ -556,7 +556,7 @@ class HiddenLayer(nn.Module):
 
         summation = self.forward_act - self.backward_act + self.lateral_act
         summation = torch.clamp(summation, min=-5, max=5)
-        new_activation = F.sigmoid(summation)
+        new_activation = 4 * F.sigmoid(summation)
 
         if should_damp:
             old_activation = new_activation
