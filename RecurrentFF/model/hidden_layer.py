@@ -159,7 +159,8 @@ class HiddenLayer(nn.Module):
 
         # Initialize the lateral weights to be the identity matrix
         self.lateral_linear = nn.Linear(size, size)
-        nn.init.orthogonal_(self.lateral_linear.weight, gain=math.sqrt(2))
+        # nn.init.orthogonal_(self.lateral_linear.weight, gain=math.sqrt(2))
+        perturbed_identity_init(self.lateral_linear.weight)
 
         self.previous_layer = None
         self.next_layer = None
@@ -554,8 +555,8 @@ class HiddenLayer(nn.Module):
             self.lateral_act = lateral
 
         summation = self.forward_act - self.backward_act + self.lateral_act
-        # summation = torch.clamp(summation, min=-5, max=5)
-        new_activation = F.leaky_relu(summation)
+        summation = torch.clamp(summation, min=-5, max=5)
+        new_activation = F.sigmoid(summation)
 
         if should_damp:
             old_activation = new_activation
