@@ -368,6 +368,7 @@ class HiddenLayer(nn.Module):
 
         # Middle layer.
         new_activation = None
+        prev_act = None
         if data is None and labels is None:
             next_layer_prev_timestep_activations = None
             prev_layer_prev_timestep_activations = None
@@ -400,26 +401,12 @@ class HiddenLayer(nn.Module):
             forward = F.linear(
                 prev_layer_stdized,
                 self.forward_linear.weight)
-            backward = -1 * F.linear(
+            backward = F.linear(
                 next_layer_stdized,
                 self.backward_linear.weight)
             lateral = F.linear(
                 prev_act_stdized,
                 self.lateral_linear.weight)
-
-            self.forward_act = forward
-            self.backward_act = backward
-            self.lateral_act = lateral
-
-            new_activation = F.leaky_relu(forward + backward + lateral)
-            # print(
-            #     f"no relu: {(forward + backward + lateral).flatten().mean()}")
-            # print(f"relu: {new_activation.flatten().mean()}")
-
-            if should_damp:
-                old_activation = new_activation
-                new_activation = (1 - self.damping_factor) * \
-                    prev_act + self.damping_factor * old_activation
 
         # Single layer scenario. Hidden layer connected to input layer and
         # output layer.
@@ -439,23 +426,12 @@ class HiddenLayer(nn.Module):
             forward = F.linear(
                 data,
                 self.forward_linear.weight)
-            backward = -1 * F.linear(
+            backward = F.linear(
                 labels,
                 self.backward_linear.weight)
             lateral = F.linear(
                 prev_act_stdized,
                 self.lateral_linear.weight)
-
-            self.forward_act = forward
-            self.backward_act = backward
-            self.lateral_act = lateral
-
-            new_activation = F.leaky_relu(forward + backward + lateral)
-
-            if should_damp:
-                old_activation = new_activation
-                new_activation = (1 - self.damping_factor) * \
-                    prev_act + self.damping_factor * old_activation
 
         # Input layer scenario. Connected to input layer and hidden layer.
         elif data is not None:
@@ -482,23 +458,12 @@ class HiddenLayer(nn.Module):
             forward = F.linear(
                 data,
                 self.forward_linear.weight)
-            backward = -1 * F.linear(
+            backward = F.linear(
                 next_layer_stdized,
                 self.backward_linear.weight)
             lateral = F.linear(
                 prev_act_stdized,
                 self.lateral_linear.weight)
-
-            self.forward_act = forward
-            self.backward_act = backward
-            self.lateral_act = lateral
-
-            new_activation = F.leaky_relu(forward + backward + lateral)
-
-            if should_damp:
-                old_activation = new_activation
-                new_activation = (1 - self.damping_factor) * \
-                    prev_act + self.damping_factor * old_activation
 
         # Output layer scenario. Connected to hidden layer and output layer.
         elif labels is not None:
@@ -525,23 +490,25 @@ class HiddenLayer(nn.Module):
             forward = F.linear(
                 prev_layer_stdized,
                 self.forward_linear.weight)
-            backward = -1 * F.linear(
+            backward = F.linear(
                 labels,
                 self.backward_linear.weight)
             lateral = F.linear(
                 prev_act_stdized,
                 self.lateral_linear.weight)
 
-            self.forward_act = forward
-            self.backward_act = backward
-            self.lateral_act = lateral
+        self.forward_act = forward
+        self.backward_act = backward
+        self.lateral_act = lateral
 
-            new_activation = F.leaky_relu(forward + backward + lateral)
+        summation = forward + backward + lateral
+        summation = torch.clamp(summation, min=0, max=5)
+        new_activation = F.sigmoid(summation)
 
-            if should_damp:
-                old_activation = new_activation
-                new_activation = (1 - self.damping_factor) * \
-                    prev_act + self.damping_factor * old_activation
+        if should_damp:
+            old_activation = new_activation
+            new_activation = (1 - self.damping_factor) * \
+                prev_act + self.damping_factor * old_activation
 
         if mode == ForwardMode.PositiveData:
             self.pos_activations.current = new_activation
