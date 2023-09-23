@@ -83,6 +83,13 @@ def perturbed_identity_init(weight, scale=0.05):
     weight.data = identity + random_perturbation
 
 
+def perturbed_identity_init_clip(weight, scale=0.05, clip_value=2.0):
+    identity = torch.eye(weight.shape[0], weight.shape[1]).to(weight.device)
+    random_perturbation = torch.randn_like(weight) * scale
+    weight.data = identity + random_perturbation
+    weight.data = torch.clamp(weight.data, -clip_value, clip_value)
+
+
 def amplified_initialization(layer: nn.Linear, amplification_factor=3.0):
     """Amplified initialization for Linear layers."""
     # Get the number of input features
@@ -161,7 +168,7 @@ class HiddenLayer(nn.Module):
         self.lateral_linear = nn.Linear(size, size)
         # nn.init.orthogonal_(self.lateral_linear.weight, gain=math.sqrt(2))
         # _custom_init(self.lateral_linear.weight, settings)
-        perturbed_identity_init(self.lateral_linear.weight)
+        perturbed_identity_init_clip(self.lateral_linear.weight)
 
         self.previous_layer = None
         self.next_layer = None
@@ -557,7 +564,8 @@ class HiddenLayer(nn.Module):
 
         summation = self.forward_act + self.backward_act + self.lateral_act
         # summation = torch.clamp(summation, min=-6, max=6)
-        new_activation = 2 * F.sigmoid(summation)
+        new_activation = self.settings.model.sigmoid_amplification * \
+            F.sigmoid(summation)
 
         if should_damp:
             old_activation = new_activation

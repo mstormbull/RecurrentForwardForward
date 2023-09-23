@@ -47,6 +47,7 @@ class Model(BaseModel):
     epochs: int
     prelabel_timesteps: int
     loss_threshold: float
+    sigmoid_amplification: int
     damping_factor: float
     epsilon: float
     skip_profiling: bool
