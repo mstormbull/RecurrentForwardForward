@@ -557,7 +557,7 @@ class HiddenLayer(nn.Module):
 
         summation = self.forward_act + self.backward_act + self.lateral_act
         # summation = torch.clamp(summation, min=-6, max=6)
-        new_activation = 6 * F.sigmoid(summation)
+        new_activation = 2 * F.sigmoid(summation)
 
         if should_damp:
             old_activation = new_activation
