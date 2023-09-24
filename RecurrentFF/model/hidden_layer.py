@@ -168,7 +168,7 @@ class HiddenLayer(nn.Module):
         self.lateral_linear = nn.Linear(size, size)
         # nn.init.orthogonal_(self.lateral_linear.weight, gain=math.sqrt(2))
         # _custom_init(self.lateral_linear.weight, settings)
-        perturbed_identity_init_clip(self.lateral_linear.weight)
+        perturbed_identity_init(self.lateral_linear.weight)
 
         self.previous_layer = None
         self.next_layer = None
