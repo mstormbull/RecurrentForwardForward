@@ -156,8 +156,8 @@ class HiddenLayer(nn.Module):
         if next_size == self.settings.data_config.num_classes:
             amplified_initialization(self.backward_linear, 3.0)
         else:
-            # nn.init.uniform_(self.backward_linear.weight, -0.05, 0.05)
-            amplified_initialization(self.backward_linear, 1.5)
+            nn.init.uniform_(self.backward_linear.weight, -0.05, 0.05)
+            # amplified_initialization(self.backward_linear, 1.5)
 
         # Initialize the lateral weights to be the identity matrix
         self.lateral_linear = nn.Linear(size, size)
