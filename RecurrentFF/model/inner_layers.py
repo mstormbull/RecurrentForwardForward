@@ -134,6 +134,10 @@ class InnerLayers(nn.Module):
         for layer in self.layers:
             layer.reset_activations(isTraining)
 
+    def step_learning_rates(self):
+        for layer in self.layers:
+            layer.step_learning_rate()
+
     def __len__(self):
         return len(self.layers)
 
