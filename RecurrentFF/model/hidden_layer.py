@@ -154,15 +154,17 @@ class HiddenLayer(nn.Module):
         self.reset_activations(True)
 
         self.forward_linear = nn.Linear(prev_size, size)
-        nn.init.kaiming_uniform_(
-            self.forward_linear.weight, nonlinearity='relu')
+        # nn.init.kaiming_uniform_(
+        #     self.forward_linear.weight, nonlinearity='relu')
+        nn.init.orthogonal_(self.forward_linear.weight, gain=math.sqrt(2))
 
         self.backward_linear = nn.Linear(next_size, size)
         if next_size == self.settings.data_config.num_classes:
             amplified_initialization(self.backward_linear, 3.0)
         else:
             # nn.init.uniform_(self.backward_linear.weight, -0.05, 0.05)
-            amplified_initialization(self.backward_linear, 1.5)
+            # amplified_initialization(self.backward_linear, 1.5)
+            nn.init.orthogonal_(self.backward_linear.weight, gain=math.sqrt(2))
 
         # Initialize the lateral weights to be the identity matrix
         self.lateral_linear = nn.Linear(size, size)
