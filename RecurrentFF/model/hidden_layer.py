@@ -176,7 +176,7 @@ class HiddenLayer(nn.Module):
                 self.parameters(),
                 lr=self.settings.model.ff_rmsprop.learning_rate,
                 momentum=self.settings.model.ff_rmsprop.momentum)
-            self.scheduler = StepLR(self.optimizer, step_size=20, gamma=0.9)
+            self.scheduler = StepLR(self.optimizer, step_size=75, gamma=0.7)
         elif self.settings.model.ff_optimizer == "adadelta":
             self.optimizer = Adadelta(
                 self.parameters(),
@@ -185,24 +185,20 @@ class HiddenLayer(nn.Module):
         self.param_name_dict = {param: name for name,
                                 param in self.named_parameters()}
 
-        l2_max = 0
-        max_expected_loss = 4
-        percentage_contribution_to_loss = 0.001
-        for param in self.param_name_dict:
-            if "forward" in self.param_name_dict[param] and "weight" in self.param_name_dict[param]:
-                l2_max += torch.norm(param).item()
-            elif "backward" in self.param_name_dict[param] and "weight" in self.param_name_dict[param]:
-                l2_max += torch.norm(param).item()
-
+        # l2_max = 0
+        # max_expected_loss = 4
+        # percentage_contribution_to_loss = 0.001
         # for param in self.param_name_dict:
-        #     if "weight" in self.param_name_dict["lateral_linear.parametrizations.weight.original"]:
-        #         l2_max += param.abs().sum() ** 2
-        self.lambda_l2 = (percentage_contribution_to_loss *
-                          max_expected_loss / l2_max)
+        #     if "forward" in self.param_name_dict[param] and "weight" in self.param_name_dict[param]:
+        #         l2_max += torch.norm(param).item()
+        #     elif "backward" in self.param_name_dict[param] and "weight" in self.param_name_dict[param]:
+        #         l2_max += torch.norm(param).item()
+        # self.lambda_l2 = (percentage_contribution_to_loss *
+        #                   max_expected_loss / l2_max)
 
     def step_learning_rate(self):
-        # self.scheduler.step()
-        pass
+        self.scheduler.step()
+        # pass
 
     def _apply(self, fn):
         """
@@ -345,12 +341,12 @@ class HiddenLayer(nn.Module):
         pos_badness = layer_activations_to_badness(pos_activations)
         neg_badness = layer_activations_to_badness(neg_activations)
 
-        l2_penalty = 0
-        for param in self.param_name_dict:
-            if "forward" in self.param_name_dict[param] and "weight" in self.param_name_dict[param]:
-                l2_penalty += torch.norm(param)
-            elif "backward" in self.param_name_dict[param] and "weight" in self.param_name_dict[param]:
-                l2_penalty += torch.norm(param)
+        # l2_penalty = 0
+        # for param in self.param_name_dict:
+        #     if "forward" in self.param_name_dict[param] and "weight" in self.param_name_dict[param]:
+        #         l2_penalty += torch.norm(param)
+        #     elif "backward" in self.param_name_dict[param] and "weight" in self.param_name_dict[param]:
+        #         l2_penalty += torch.norm(param)
 
         # torch.sum(torch.stack([torch.abs(
         #     p).sum() for p, name in self.param_name_dict.items() if "weight" in name]))
@@ -362,8 +358,10 @@ class HiddenLayer(nn.Module):
             (-1 * neg_badness) + self.settings.model.loss_threshold,
             pos_badness - self.settings.model.loss_threshold
         ])).mean()
-        total_loss = layer_loss + self.lambda_l2 * l2_penalty
-        total_loss.backward()
+        # total_loss = layer_loss + self.lambda_l2 * l2_penalty
+        # total_loss.backward()
+
+        layer_loss.backward()
 
         self.optimizer.step()
         return layer_loss
