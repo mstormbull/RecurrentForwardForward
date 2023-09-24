@@ -5,6 +5,7 @@ from torch import nn
 from torch.nn import Module
 from torch.nn import functional as F
 from torch.optim import RMSprop, Adam, Adadelta, SGD
+from torch.optim.lr_scheduler import StepLR
 
 from RecurrentFF.util import (
     Activations,
@@ -152,6 +153,7 @@ class HiddenLayer(nn.Module):
                 self.parameters(),
                 lr=self.settings.model.ff_rmsprop.learning_rate,
                 momentum=self.settings.model.ff_rmsprop.momentum)
+            self.scheduler = StepLR(self.optimizer, step_size=100, gamma=0.7)
         elif self.settings.model.ff_optimizer == "adadelta":
             self.optimizer = Adadelta(
                 self.parameters(),
@@ -159,6 +161,9 @@ class HiddenLayer(nn.Module):
 
         self.param_name_dict = {param: name for name,
                                 param in self.named_parameters()}
+
+    def step_learning_rate(self):
+        self.scheduler.step()
 
     def _apply(self, fn):
         """
