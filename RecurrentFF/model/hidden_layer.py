@@ -400,7 +400,7 @@ class HiddenLayer(nn.Module):
             forward = F.linear(
                 prev_layer_stdized,
                 self.forward_linear.weight)
-            backward = -1 * F.linear(
+            backward = F.linear(
                 next_layer_stdized,
                 self.backward_linear.weight)
             lateral = F.linear(
@@ -439,7 +439,7 @@ class HiddenLayer(nn.Module):
             forward = F.linear(
                 data,
                 self.forward_linear.weight)
-            backward = -1 * F.linear(
+            backward = F.linear(
                 labels,
                 self.backward_linear.weight)
             lateral = F.linear(
@@ -482,7 +482,7 @@ class HiddenLayer(nn.Module):
             forward = F.linear(
                 data,
                 self.forward_linear.weight)
-            backward = -1 * F.linear(
+            backward = F.linear(
                 next_layer_stdized,
                 self.backward_linear.weight)
             lateral = F.linear(
@@ -525,7 +525,7 @@ class HiddenLayer(nn.Module):
             forward = F.linear(
                 prev_layer_stdized,
                 self.forward_linear.weight)
-            backward = -1 * F.linear(
+            backward = F.linear(
                 labels,
                 self.backward_linear.weight)
             lateral = F.linear(
