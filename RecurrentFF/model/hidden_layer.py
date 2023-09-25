@@ -416,10 +416,9 @@ class HiddenLayer(nn.Module):
             self.backward_act = backward
             self.lateral_act = lateral
 
-            new_activation = F.leaky_relu(forward + backward + lateral)
-            # print(
-            #     f"no relu: {(forward + backward + lateral).flatten().mean()}")
-            # print(f"relu: {new_activation.flatten().mean()}")
+            summation = forward + backward + lateral
+            summation = torch.clamp(summation, min=-2, max=2)
+            new_activation = F.leaky_relu(summation)
 
             if should_damp:
                 old_activation = new_activation
@@ -455,7 +454,9 @@ class HiddenLayer(nn.Module):
             self.backward_act = backward
             self.lateral_act = lateral
 
-            new_activation = F.leaky_relu(forward + backward + lateral)
+            summation = forward + backward + lateral
+            summation = torch.clamp(summation, min=-2, max=2)
+            new_activation = F.leaky_relu(summation)
 
             if should_damp:
                 old_activation = new_activation
@@ -498,7 +499,9 @@ class HiddenLayer(nn.Module):
             self.backward_act = backward
             self.lateral_act = lateral
 
-            new_activation = F.leaky_relu(forward + backward + lateral)
+            summation = forward + backward + lateral
+            summation = torch.clamp(summation, min=-2, max=2)
+            new_activation = F.leaky_relu(summation)
 
             if should_damp:
                 old_activation = new_activation
@@ -541,7 +544,9 @@ class HiddenLayer(nn.Module):
             self.backward_act = backward
             self.lateral_act = lateral
 
-            new_activation = F.leaky_relu(forward + backward + lateral)
+            summation = forward + backward + lateral
+            summation = torch.clamp(summation, min=-2, max=2)
+            new_activation = F.leaky_relu(summation)
 
             if should_damp:
                 old_activation = new_activation
