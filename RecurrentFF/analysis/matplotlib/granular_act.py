@@ -7,12 +7,12 @@ from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.decomposition import PCA
 
 
-OUTPUT_ACTIVATION_LIMIT_LOWER = -0.5
-OUTPUT_ACTIVATION_LIMIT_UPPER = 8
+OUTPUT_ACTIVATION_LIMIT_LOWER = 0
+OUTPUT_ACTIVATION_LIMIT_UPPER = 4
 
 BASE_PT_PATH = "./artifacts/activations"
 
-LAYERS = 5
+LAYERS = 3
 
 
 def plot_cosine_similarity_multi_file(file_names, activation_type="correct"):
@@ -61,6 +61,17 @@ def plot_cosine_similarity_multi_file(file_names, activation_type="correct"):
                 [basic_comparisons, complex_comparisons]):
             ax = axes[layer, col]
 
+            d1 = accum_data[f'{activation_type}_forward_activations'][:, layer, :].cpu(
+            ).numpy()
+            d2 = accum_data[f'{activation_type}_backward_activations'][:, layer, :].cpu(
+            ).numpy()
+            d3 = accum_data[f'{activation_type}_lateral_activations'][:, layer, :].cpu(
+            ).numpy()
+
+            # concat all the data
+            all_data = np.concatenate([d1, d2, d3], axis=0)
+            pca = PCA(n_components=5).fit(all_data)
+
             for act1, act2 in comparisons:
                 # Fetch the data for the first activation type for the current
                 # layer
@@ -78,8 +89,8 @@ def plot_cosine_similarity_multi_file(file_names, activation_type="correct"):
                     data2 = accum_data[f'{activation_type}_{act2}_activations'][:, layer, :].cpu(
                     ).numpy()
 
-                all_data = np.concatenate([data1, data2], axis=0)
-                pca = PCA(n_components=5).fit(all_data)
+                # all_data = np.concatenate([data1, data2], axis=0)
+                # pca = PCA(n_components=5).fit(all_data)
                 data1_projected = pca.transform(data1)
                 data2_projected = pca.transform(data2)
 
@@ -206,7 +217,7 @@ def plot_l2_norm_across_time(file_name, activation_type="correct"):
         # ax_l2.plot(l2_norm_sum, label="Summed Activations", linestyle="--")
 
         # Plot the L2 norm of the summed activations after applying leaky_relu
-        leaky_relu_sum_activations = F.leaky_relu(
+        leaky_relu_sum_activations = 4 * F.sigmoid(
             torch.tensor(sum_activations)).numpy()
         l2_norm_leaky = np.linalg.norm(leaky_relu_sum_activations, axis=1)
         ax_l2.plot(l2_norm_leaky,
@@ -273,8 +284,8 @@ def plot_activation_heatmap(file_name, activation_type="correct"):
             activation_data = data[activation_key][:, layer, :].cpu().numpy()
             ax = axes[idx, layer]
 
-            vmin = -50
-            vmax = 30
+            vmin = -10
+            vmax = 10
             if "lateral" in activation_key.lower():
                 vmin = -10
                 vmax = 10
@@ -304,8 +315,8 @@ def plot_activation_heatmap(file_name, activation_type="correct"):
             cmap='viridis',
             interpolation='nearest',
             origin='lower',
-            vmin=OUTPUT_ACTIVATION_LIMIT_LOWER,
-            vmax=OUTPUT_ACTIVATION_LIMIT_UPPER)
+            vmin=-10,
+            vmax=10)
         fig.colorbar(cax, ax=ax)
         ax.set_title(
             f'Actual Combined Activations (With Leaky ReLU) for Layer {layer} in {file_name}')
@@ -322,7 +333,7 @@ def plot_activation_heatmap(file_name, activation_type="correct"):
         summed_activations = summed_activations
 
         # With leaky_relu
-        summed_activations_leaky = F.leaky_relu(
+        summed_activations_leaky = 4 * F.sigmoid(
             summed_activations)
         summed_activations_leaky = torch.abs(
             summed_activations_leaky).cpu().numpy()
@@ -338,8 +349,8 @@ def plot_activation_heatmap(file_name, activation_type="correct"):
             cmap='viridis',
             interpolation='nearest',
             origin='lower',
-            vmin=-50,
-            vmax=30)
+            vmin=-10,
+            vmax=10)
         fig.colorbar(cax, ax=ax)
         ax.set_title(
             f'Summed Activations (No Leaky ReLU) for Layer {layer} in {file_name}')
@@ -382,11 +393,11 @@ if __name__ == '__main__':
         'test_sample_1.pt',
         'test_sample_4.pt',
         'test_sample_5.pt',
-        'test_sample_6.pt',
+        'test_sample_14.pt',
         'test_sample_7.pt',
-        'test_sample_8.pt',
+        'test_sample_12.pt',
         'test_sample_9.pt',
-        'test_sample_11.pt']
+        'test_sample_13.pt']
     plot_cosine_similarity_multi_file(
         file_names, activation_type="correct")
     plot_cosine_similarity_multi_file(

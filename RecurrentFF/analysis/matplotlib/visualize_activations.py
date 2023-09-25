@@ -275,7 +275,7 @@ def plot_sparsity_over_time(threshold=0.01):
             avg_over_all_layers = sparsity_fraction.mean(dim=-1)
             plt.plot(avg_over_all_layers.cpu().numpy(),
                      label="Average Over All Layers", linestyle='--')
-            plt.ylim(0, 0.2)
+            plt.ylim(0, 2)
 
             plt.title(f'Sparsity Over Time ({scenario} - {identifier})')
             plt.xlabel('Time')
@@ -334,8 +334,8 @@ def plot_activation_percentiles_over_time(percentiles=[10, 25, 50, 75, 90]):
 
 
 if __name__ == "__main__":
-    plot_mean_stddev()
-    plot_activations_over_timesteps()
-    plot_activations_over_time()
+    # plot_mean_stddev()
+    # plot_activations_over_timesteps()
+    # plot_activations_over_time()
     plot_sparsity_over_time()
-    plot_activation_percentiles_over_time()
+    # plot_activation_percentiles_over_time()

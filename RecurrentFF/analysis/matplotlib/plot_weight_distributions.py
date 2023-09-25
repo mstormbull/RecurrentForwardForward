@@ -2,7 +2,7 @@ import torch
 import numpy as np
 import matplotlib.pyplot as plt
 
-LAYERS = 5
+LAYERS = 3
 
 
 def plot_weight_distributions(weights_list, labels, title):
@@ -20,13 +20,14 @@ def plot_weight_distributions(weights_list, labels, title):
 
 
 # Load the weights
-weights = torch.load('IdentityMoneyball.pth', map_location=torch.device('cpu'))
+weights = torch.load(
+    '/home/andrew/Documents/tmp/weights/MNIST_2023-09-25_00-46-41_ZKYW1Q.pth', map_location=torch.device('cpu'))
 
 # Plot the distributions for each layer
 for layer in range(LAYERS):
     forward_key = f'inner_layers.layers.{layer}.forward_linear.weight'
     backward_key = f'inner_layers.layers.{layer}.backward_linear.weight'
-    lateral_key = f'inner_layers.layers.{layer}.lateral_linear.parametrizations.weight.original'
+    lateral_key = f'inner_layers.layers.{layer}.lateral_linear.weight'
 
     plot_weight_distributions(
         [weights[forward_key].cpu().numpy(), weights[backward_key].cpu().numpy(),
