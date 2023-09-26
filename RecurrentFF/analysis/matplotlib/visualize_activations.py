@@ -334,8 +334,8 @@ def plot_activation_percentiles_over_time(percentiles=[10, 25, 50, 75, 90]):
 
 
 if __name__ == "__main__":
-    plot_mean_stddev()
-    plot_activations_over_timesteps()
+    # plot_mean_stddev()
+    # plot_activations_over_timesteps()
     plot_activations_over_time()
-    plot_sparsity_over_time()
-    plot_activation_percentiles_over_time()
+    # plot_sparsity_over_time()
+    # plot_activation_percentiles_over_time()

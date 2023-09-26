@@ -40,7 +40,7 @@ if __name__ == "__main__":
     model = RecurrentFFNet(settings).to(settings.device.device)
 
     model.load_state_dict(torch.load(
-        "IdentityMoneyball.pth", map_location=settings.device.device))
+        "MNIST_2023-09-23_23-43-06_K7R5EV.pth", map_location=settings.device.device))
 
     model.predict(DataScenario.StaticSingleClass,
                   test_loader, NUM_BATCHES, write_activations=True)

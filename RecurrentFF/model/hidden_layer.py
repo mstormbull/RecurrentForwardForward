@@ -417,7 +417,7 @@ class HiddenLayer(nn.Module):
             self.lateral_act = lateral
 
             summation = forward + backward + lateral
-            summation = torch.clamp(summation, min=-2, max=2)
+            # summation = torch.clamp(summation, min=-2, max=2)
             new_activation = F.leaky_relu(summation)
 
             if should_damp:
@@ -455,7 +455,7 @@ class HiddenLayer(nn.Module):
             self.lateral_act = lateral
 
             summation = forward + backward + lateral
-            summation = torch.clamp(summation, min=-2, max=2)
+            # summation = torch.clamp(summation, min=-2, max=2)
             new_activation = F.leaky_relu(summation)
 
             if should_damp:
@@ -500,7 +500,7 @@ class HiddenLayer(nn.Module):
             self.lateral_act = lateral
 
             summation = forward + backward + lateral
-            summation = torch.clamp(summation, min=-2, max=2)
+            # summation = torch.clamp(summation, min=-2, max=2)
             new_activation = F.leaky_relu(summation)
 
             if should_damp:
@@ -545,7 +545,7 @@ class HiddenLayer(nn.Module):
             self.lateral_act = lateral
 
             summation = forward + backward + lateral
-            summation = torch.clamp(summation, min=-2, max=2)
+            # summation = torch.clamp(summation, min=-2, max=2)
             new_activation = F.leaky_relu(summation)
 
             if should_damp:

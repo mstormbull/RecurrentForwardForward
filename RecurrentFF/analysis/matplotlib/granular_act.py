@@ -61,6 +61,17 @@ def plot_cosine_similarity_multi_file(file_names, activation_type="correct"):
                 [basic_comparisons, complex_comparisons]):
             ax = axes[layer, col]
 
+            d1 = accum_data[f'{activation_type}_forward_activations'][:, layer, :].cpu(
+            ).numpy()
+            d2 = accum_data[f'{activation_type}_backward_activations'][:, layer, :].cpu(
+            ).numpy()
+            d3 = accum_data[f'{activation_type}_lateral_activations'][:, layer, :].cpu(
+            ).numpy()
+
+            # concat all the data
+            all_data = np.concatenate([d1, d2, d3], axis=0)
+            pca = PCA(n_components=3).fit(all_data)
+
             for act1, act2 in comparisons:
                 # Fetch the data for the first activation type for the current
                 # layer
@@ -78,8 +89,8 @@ def plot_cosine_similarity_multi_file(file_names, activation_type="correct"):
                     data2 = accum_data[f'{activation_type}_{act2}_activations'][:, layer, :].cpu(
                     ).numpy()
 
-                all_data = np.concatenate([data1, data2], axis=0)
-                pca = PCA(n_components=5).fit(all_data)
+                # all_data = np.concatenate([data1, data2], axis=0)
+                # pca = PCA(n_components=5).fit(all_data)
                 data1_projected = pca.transform(data1)
                 data2_projected = pca.transform(data2)
 
@@ -273,11 +284,11 @@ def plot_activation_heatmap(file_name, activation_type="correct"):
             activation_data = data[activation_key][:, layer, :].cpu().numpy()
             ax = axes[idx, layer]
 
-            vmin = -50
+            vmin = -20
             vmax = 30
             if "lateral" in activation_key.lower():
-                vmin = -10
-                vmax = 10
+                vmin = -20
+                vmax = 20
 
             cax = ax.imshow(
                 activation_data,
@@ -338,7 +349,7 @@ def plot_activation_heatmap(file_name, activation_type="correct"):
             cmap='viridis',
             interpolation='nearest',
             origin='lower',
-            vmin=-50,
+            vmin=-20,
             vmax=30)
         fig.colorbar(cax, ax=ax)
         ax.set_title(
