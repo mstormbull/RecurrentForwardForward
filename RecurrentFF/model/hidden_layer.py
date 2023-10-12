@@ -7,6 +7,7 @@ from torch import Tensor, nn
 from torch.nn import Module
 from torch.nn import functional as F
 from torch.optim import RMSprop, Adam, Adadelta, Optimizer
+from torch.optim.lr_scheduler import StepLR
 
 from RecurrentFF.util import (
     Activations,
@@ -162,6 +163,9 @@ class HiddenLayer(nn.Module):
                 self.parameters(),
                 lr=self.settings.model.ff_adadelta.learning_rate)
 
+        self.scheduler = StepLR(
+            self.optimizer, step_size=self.settings.model.lr_step_size, gamma=self.settings.model.lr_gamma)
+
         self.param_name_dict = {param: name for name,
                                 param in self.named_parameters()}
 
@@ -220,6 +224,9 @@ class HiddenLayer(nn.Module):
         self.next_layer = next_layer
 
         return state
+
+    def step_learning_rate(self) -> None:
+        self.scheduler.step()
 
     def reset_activations(self, isTraining: bool) -> None:
         activations_dim = None
@@ -381,10 +388,10 @@ class HiddenLayer(nn.Module):
 
         # Middle layer.
         new_activation: Tensor
+        prev_act: Tensor = None  # type: ignore[assignment]
         if data is None and labels is None:
             next_layer_prev_timestep_activations = None
             prev_layer_prev_timestep_activations = None
-            prev_act: Tensor = None  # type: ignore[assignment]
             if mode == ForwardMode.PositiveData:
                 next_layer_prev_timestep_activations = cast(
                     Activations, next_layer.pos_activations).previous
@@ -429,7 +436,6 @@ class HiddenLayer(nn.Module):
         # Single layer scenario. Hidden layer connected to input layer and
         # output layer.
         elif data is not None and labels is not None:
-            prev_act = None
             if mode == ForwardMode.PositiveData:
                 assert self.pos_activations is not None
                 prev_act = cast(Activations, self.pos_activations).previous
@@ -456,7 +462,6 @@ class HiddenLayer(nn.Module):
 
         # Input layer scenario. Connected to input layer and hidden layer.
         elif data is not None:
-            prev_act = None
             next_layer_prev_timestep_activations = None
             if mode == ForwardMode.PositiveData:
                 next_layer_prev_timestep_activations = cast(
@@ -492,7 +497,6 @@ class HiddenLayer(nn.Module):
         # Output layer scenario. Connected to hidden layer and output layer.
         elif labels is not None:
             prev_layer_prev_timestep_activations = None
-            prev_act = None
             if mode == ForwardMode.PositiveData:
                 prev_layer_prev_timestep_activations = cast(
                     Activations, previous_layer.pos_activations).previous

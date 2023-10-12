@@ -55,6 +55,9 @@ class Model(BaseModel):
     should_replace_neg_data: bool
     should_load_weights: bool
 
+    lr_step_size: int
+    lr_gamma: float
+
     ff_activation: str
 
     ff_optimizer: str
