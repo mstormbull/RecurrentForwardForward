@@ -146,10 +146,14 @@ class RecurrentFFNet(nn.Module):
             layer's activations into a 'badness' score. This function operates on the RecurrentFFNet model level
             and is called during the training process.
         """
+        # TODO: call to build the potential hidden state initializations via noise stable states
+
         total_batch_count = 0
         best_test_accuracy: float = 0
         for epoch in range(0, self.settings.model.epochs):
             logging.info("Epoch: " + str(epoch))
+
+            # TODO: if epoch mod something == 0, rebuild potential hidden state initializations?
 
             for batch_num, (input_data, label_data) in enumerate(train_loader):
                 input_data.move_to_device_inplace(self.settings.device.device)
@@ -235,6 +239,8 @@ class RecurrentFFNet(nn.Module):
             label_data_sample = (
                 label_data.pos_labels[iteration],
                 label_data.neg_labels[iteration])
+
+            # TODO: alter label data
 
             self.inner_layers.advance_layers_train(
                 input_data_sample, label_data_sample, True, layer_metrics)

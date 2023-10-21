@@ -430,8 +430,11 @@ class StaticSingleClassProcessor(DataScenarioProcessor):
                         iterations // 10
                     badnesses = []
                     for iteration in range(0, iterations):
+                        # TODO: adjust labels based on iteration
+
                         self.inner_layers.advance_layers_forward(
                             forward_mode, data[iteration], one_hot_labels, True)
+
                         if write_activations:
                             activity_tracker.track_partial_activations(
                                 self.inner_layers)
