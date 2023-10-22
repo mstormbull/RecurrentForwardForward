@@ -1,8 +1,9 @@
+from __future__ import annotations
 from datetime import datetime
 import logging
 import random
 import string
-from typing import List, Tuple, cast
+from typing import List, Self, Tuple, cast
 
 
 import torch
@@ -29,6 +30,54 @@ from RecurrentFF.util import (
 from RecurrentFF.settings import (
     Settings,
 )
+
+
+class StableStateNetworkActivations:
+    def __init__(self, network: RecurrentFFNet) -> Self:
+        activations = []
+        for layer in network.inner_layers:
+            activations.append(layer.predict_activations)
+
+        activations = torch.stack(activations, dim=1)
+        activations = activations.permute(1, 0, 2)
+
+        # network activations of shape (batch, layer, representation)
+        # order of activation types: pos, neg
+        self.activations = activations
+
+    def retrieve_stable_state_activations(self, batch_index: int):
+        # return tuple of size 2 of tensors with shape (layer, representation)
+        return tuple(
+            self.network_activations[batch_index, activation_type, :, :]
+            for activation_type in range(3)
+        )
+
+
+def generate_activation_initialization_samples(train_loader: torch.utils.data.DataLoader, processor: StaticSingleClassProcessor, inner_layers: InnerLayers):
+    # get the dimensions of a data sample
+    (train_input_data, train_label_data) = next(iter(train_loader))
+    data_sample_size = train_input_data[0][0].size()
+    label_sample_shape = train_label_data[0][0].size()
+
+    # generate noise of these dimensions (1000 samples)
+    noise = torch.randn(
+        1000,
+        data_sample_size[0])
+
+    # generate equally weighted labels
+    preinit_upper_clamped_tensor = processor.get_preinit_upper_clamped_tensor(
+        label_sample_shape)
+
+    # run the network on the noise for 100 timesteps indicating stable state
+    for _preinit_step in range(
+            0, 1000):
+        inner_layers.advance_layers_forward(
+            ForwardMode.PredictData, noise, preinit_upper_clamped_tensor, False)
+
+    # TODO: confirm stable state with debugging
+
+    # return the stable state activations
+    return StableStateNetworkActivations(inner_layers)
 
 
 # TODO: try use separate optimizer for lateral connections
@@ -60,7 +109,7 @@ class RecurrentFFNet(nn.Module):
     recurrent architecture.
     """
 
-    def __init__(self, settings: Settings):
+    def __init__(self, settings: Settings, train_loader: torch.utils.data.DataLoader):
         logging.info("Initializing network")
         super(RecurrentFFNet, self).__init__()
 
@@ -103,6 +152,8 @@ class RecurrentFFNet(nn.Module):
             "_" + datetime.now().strftime("%Y-%m-%d_%H-%M-%S") + "_" + ''.join(
                 random.choices(string.ascii_uppercase + string.digits, k=6)) + ".pth"
 
+        self.activation_initialization_samples = generate_activation_initialization_samples(
+            train_loader, self.processor, self.inner_layers)
         logging.info("Finished initializing network")
 
     def predict(
