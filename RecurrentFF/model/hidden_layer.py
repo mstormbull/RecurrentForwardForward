@@ -173,6 +173,8 @@ class HiddenLayer(nn.Module):
         self.backward_act: Tensor
         self.lateral_act: Tensor
 
+        self.stable_state_activations: Optional[torch.Tensor] = None
+
     def _apply(self, fn):  # type: ignore
         """
         Override apply, but we don't want to apply to sibling layers as that
@@ -233,38 +235,50 @@ class HiddenLayer(nn.Module):
         if isTraining:
             activations_dim = self.train_activations_dim
 
-            pos_activations_current = torch.zeros(
-                activations_dim[0], activations_dim[1]).to(
-                self.settings.device.device)
-            pos_activations_previous = torch.zeros(
-                activations_dim[0], activations_dim[1]).to(
-                self.settings.device.device)
+            if self.stable_state_activations is None:
+                pos_activations_current = torch.zeros(
+                    activations_dim[0], activations_dim[1]).to(
+                    self.settings.device.device)
+                pos_activations_previous = torch.zeros(
+                    activations_dim[0], activations_dim[1]).to(
+                    self.settings.device.device)
+                neg_activations_current = torch.zeros(
+                    activations_dim[0], activations_dim[1]).to(
+                    self.settings.device.device)
+                neg_activations_previous = torch.zeros(
+                    activations_dim[0], activations_dim[1]).to(
+                    self.settings.device.device)
+            else:
+                pos_activations_stable_state = self.stable_state_activations.retrieve_random_stable_state_activations().clone()
+                neg_activations_stable_state = self.stable_state_activations.retrieve_random_stable_state_activations().clone()
+                pos_activations_current = pos_activations_stable_state.clone()
+                pos_activations_previous = pos_activations_stable_state.clone()
+                neg_activations_current = neg_activations_stable_state.clone()
+                neg_activations_previous = neg_activations_stable_state.clone()
+
             self.pos_activations = Activations(
                 pos_activations_current, pos_activations_previous)
-
-            neg_activations_current = torch.zeros(
-                activations_dim[0], activations_dim[1]).to(
-                self.settings.device.device)
-            neg_activations_previous = torch.zeros(
-                activations_dim[0], activations_dim[1]).to(
-                self.settings.device.device)
             self.neg_activations = Activations(
                 neg_activations_current, neg_activations_previous)
-
             self.predict_activations = None
 
         else:
             activations_dim = self.test_activations_dim
 
-            predict_activations_current = torch.zeros(
-                activations_dim[0], activations_dim[1]).to(
-                self.settings.device.device)
-            predict_activations_previous = torch.zeros(
-                activations_dim[0], activations_dim[1]).to(
-                self.settings.device.device)
+            if self.stable_state_activations is None:
+                predict_activations_current = torch.zeros(
+                    activations_dim[0], activations_dim[1]).to(
+                    self.settings.device.device)
+                predict_activations_previous = torch.zeros(
+                    activations_dim[0], activations_dim[1]).to(
+                    self.settings.device.device)
+            else:
+                activations_stable_state = self.stable_state_activations.retrieve_random_stable_state_activations().clone()
+                predict_activations_current = activations_stable_state.clone()
+                predict_activations_previous = activations_stable_state.clone()
+
             self.predict_activations = Activations(
                 predict_activations_current, predict_activations_previous)
-
             self.pos_activations = None
             self.neg_activations = None
 

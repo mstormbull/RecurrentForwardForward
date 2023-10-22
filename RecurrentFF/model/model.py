@@ -33,31 +33,21 @@ from RecurrentFF.settings import (
 
 
 class StableStateNetworkActivations:
-    def __init__(self, network: RecurrentFFNet) -> Self:
-        activations = []
-        for layer in network.inner_layers:
-            activations.append(layer.predict_activations)
+    def __init__(self, activations: torch.Tensor) -> Self:
+        # activations of shape (batch, representation)
+        self.network_activations = activations
 
-        activations = torch.stack(activations, dim=1)
-        activations = activations.permute(1, 0, 2)
-
-        # network activations of shape (batch, layer, representation)
-        # order of activation types: pos, neg
-        self.activations = activations
-
-    def retrieve_stable_state_activations(self, batch_index: int):
-        # return tuple of size 2 of tensors with shape (layer, representation)
-        return tuple(
-            self.network_activations[batch_index, activation_type, :, :]
-            for activation_type in range(3)
-        )
+    def retrieve_random_stable_state_activations(self):
+        batch_index = random.randint(
+            0, self.network_activations.shape[0] - 1)
+        return self.network_activations[batch_index]
 
 
 def generate_activation_initialization_samples(train_loader: torch.utils.data.DataLoader, processor: StaticSingleClassProcessor, inner_layers: InnerLayers):
     # get the dimensions of a data sample
     (train_input_data, train_label_data) = next(iter(train_loader))
     data_sample_size = train_input_data[0][0].size()
-    label_sample_shape = train_label_data[0][0].size()
+    label_sample_shape = train_label_data[0].shape
 
     # generate noise of these dimensions (1000 samples)
     noise = torch.randn(
@@ -77,7 +67,20 @@ def generate_activation_initialization_samples(train_loader: torch.utils.data.Da
     # TODO: confirm stable state with debugging
 
     # return the stable state activations
-    return StableStateNetworkActivations(inner_layers)
+    activations = []
+    for layer in inner_layers:
+        activations.append(layer.predict_activations)
+
+    # network activations of shape (layer, batch, representation)
+    activations = torch.stack(activations, dim=1)
+
+    # iterate through activations layer dim and create StableStateNetworkActivations
+    stable_state_network_activations = []
+    for layer_index in range(0, activations.shape[0]):
+        stable_state_network_activations.append(
+            StableStateNetworkActivations(activations[layer_index]))
+
+    return stable_state_network_activations
 
 
 # TODO: try use separate optimizer for lateral connections
@@ -152,8 +155,12 @@ class RecurrentFFNet(nn.Module):
             "_" + datetime.now().strftime("%Y-%m-%d_%H-%M-%S") + "_" + ''.join(
                 random.choices(string.ascii_uppercase + string.digits, k=6)) + ".pth"
 
-        self.activation_initialization_samples = generate_activation_initialization_samples(
+        stable_state_activations = generate_activation_initialization_samples(
             train_loader, self.processor, self.inner_layers)
+        for i, layer in enumerate(self.inner_layers):
+            layer.stable_state_activations = stable_state_activations[
+                i]
+
         logging.info("Finished initializing network")
 
     def predict(
