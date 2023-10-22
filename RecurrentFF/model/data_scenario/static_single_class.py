@@ -10,7 +10,7 @@ import wandb
 
 from RecurrentFF.model.data_scenario.processor import DataScenarioProcessor
 from RecurrentFF.model.inner_layers import InnerLayers
-from RecurrentFF.util import Activations, LatentAverager, TrainLabelData, layer_activations_to_badness, ForwardMode
+from RecurrentFF.util import Activations, LatentAverager, TrainLabelData, layer_activations_to_badness, ForwardMode, scale_labels_by_timestep
 from RecurrentFF.settings import Settings
 
 
@@ -430,10 +430,11 @@ class StaticSingleClassProcessor(DataScenarioProcessor):
                         iterations // 10
                     badnesses = []
                     for iteration in range(0, iterations):
-                        # TODO: adjust labels based on iteration
+                        one_hot_labels_rescaled = scale_labels_by_timestep(
+                            one_hot_labels, iteration, iterations)
 
                         self.inner_layers.advance_layers_forward(
-                            forward_mode, data[iteration], one_hot_labels, True)
+                            forward_mode, data[iteration], one_hot_labels_rescaled, True)
 
                         if write_activations:
                             activity_tracker.track_partial_activations(
