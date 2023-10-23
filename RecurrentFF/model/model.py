@@ -38,8 +38,9 @@ class StableStateNetworkActivations:
         self.network_activations = activations
 
     def retrieve_random_stable_state_activations(self, batch_size: int):
-        batch_index = random.randint(
-            0, self.network_activations.shape[0] - 1)
+        # batch_index = random.randint(
+        #     0, self.network_activations.shape[0] - 1)
+        batch_index = 0
         return self.network_activations[batch_index].unsqueeze(0).repeat(batch_size, 1)
 
 

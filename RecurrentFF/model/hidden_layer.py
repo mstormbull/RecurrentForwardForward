@@ -547,7 +547,7 @@ class HiddenLayer(nn.Module):
                 prev_act_stdized,
                 self.lateral_linear.weight)
 
-        new_activation = F.sigmoid(
+        new_activation = F.leaky_relu(
             self.forward_act + self.backward_act + self.lateral_act)
 
         if should_damp:
