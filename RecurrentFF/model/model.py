@@ -323,10 +323,10 @@ class RecurrentFFNet(nn.Module):
                 label_data.pos_labels[iteration],
                 label_data.neg_labels[iteration])
 
-            label_data_rescaled = scale_labels_by_timestep_train(
-                label_data_sample, iteration, iterations)
+            # label_data_rescaled = scale_labels_by_timestep_train(
+            #     label_data_sample, iteration, iterations)
             self.inner_layers.advance_layers_train(
-                input_data_sample, label_data_rescaled, True, layer_metrics)
+                input_data_sample, label_data_sample, True, layer_metrics)
 
             lower_iteration_threshold = iterations // 2 - \
                 iterations // 10
