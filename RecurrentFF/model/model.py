@@ -41,7 +41,7 @@ class StableStateNetworkActivations:
         # batch_index = random.randint(
         #     0, self.network_activations.shape[0] - 1)
         batch_index = 0
-        return self.network_activations[batch_index].unsqueeze(0).repeat(batch_size, 1)
+        return self.network_activations[batch_index].detach().clone().unsqueeze(0).repeat(batch_size, 1)
 
 
 def generate_activation_initialization_samples(train_loader: torch.utils.data.DataLoader, processor: StaticSingleClassProcessor, inner_layers: InnerLayers, settings: Settings):

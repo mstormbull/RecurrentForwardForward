@@ -252,9 +252,9 @@ class HiddenLayer(nn.Module):
                     self.settings.device.device)
             else:
                 pos_activations_stable_state = self.train_stable_state_activations.retrieve_random_stable_state_activations(
-                    self.settings.data_config.train_batch_size).clone()
+                    self.settings.data_config.train_batch_size)
                 neg_activations_stable_state = self.train_stable_state_activations.retrieve_random_stable_state_activations(
-                    self.settings.data_config.train_batch_size).clone()
+                    self.settings.data_config.train_batch_size)
                 pos_activations_current = pos_activations_stable_state.clone()
                 pos_activations_previous = pos_activations_stable_state.clone()
                 neg_activations_current = neg_activations_stable_state.clone()
@@ -278,7 +278,7 @@ class HiddenLayer(nn.Module):
                     self.settings.device.device)
             else:
                 activations_stable_state = self.predict_stable_state_activations.retrieve_random_stable_state_activations(
-                    self.settings.data_config.test_batch_size).clone()
+                    self.settings.data_config.test_batch_size)
                 predict_activations_current = activations_stable_state.clone()
                 predict_activations_previous = activations_stable_state.clone()
 
