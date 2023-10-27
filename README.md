@@ -8,8 +8,7 @@ The implementation of the Recurrent Forward Forward Network is based on the [fol
 This network differs from the paper in that:
 1. It inverts the objective function to be more biologically plausible, and to show more similarity with predictive coding.
 2. It hides the label for the first few timesteps, playing into the concept of predictive coding. (i.e. high activations initially, followed by low activations in case of successfully predicted samples)
-3. Supports sparse connectivity between layers, playing into concept of modularity / biological plausibility.
-4. It was unclear if Hinton actually implemented the recurrent connections, as the network diagram he provided was copied from his GLOM paper. But I did implement these connections here.
+3. It was unclear if Hinton actually implemented the recurrent connections, as the network diagram he provided was copied from his GLOM paper. But I did implement these connections here.
 
 Here is the architecture diagram from the original paper, which is what I have implemented:
 ![Recurrent Forward Forward Network](img/Fig3.png "Recurrent Forward Forward")
@@ -22,17 +21,18 @@ python -m RecurrentFF.benchmarks.mnist.mnist
 ```
 
 ## Model TODO:
-
 - [x] Recurrent connections
 - [x] Lateral connections
 - [x] Data and label inputs conducive to changing accross timesteps
 - [x] Dynamic negative data
 - [x] Invert objective function: low activations for positive data
+
+## Potential Additions:
 - [ ] Receptive fields
 - [ ] Fast weights
 - [ ] Peer normalization
-- [ ] Non-differentiable black boxes within network? Which pattern is best?
-- [ ] Support data manipulation for positive data
+- [ ] Non-differentiable black boxes within network?
+- [ ] Support data manipulation for positive data (i.e. transforms)
 - [ ] Generative circuit
 - [ ] Support data reconstruction
 - [ ] Support negative data synthesis
@@ -42,7 +42,6 @@ python -m RecurrentFF.benchmarks.mnist.mnist
 - [x] Benchmark on MNIST
 - [x] Benchmark on Moving MNIST
 - [x] Benchmark on Seq MNIST
-- [ ] Benchmark on non-static multiclass dataset
 
 ## Contributing:
 
