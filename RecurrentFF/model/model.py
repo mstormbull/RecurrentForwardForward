@@ -5,7 +5,6 @@ import random
 import string
 from typing import List, Self, Tuple, cast
 
-
 import torch
 from torch import nn
 import wandb
@@ -235,6 +234,8 @@ class RecurrentFFNet(nn.Module):
         best_test_accuracy: float = 0
         for epoch in range(0, self.settings.model.epochs):
             logging.info("Epoch: " + str(epoch))
+
+            # self.attach_stable_state_preinitializations(train_loader)
 
             # TODO: if epoch mod something == 0, rebuild potential hidden state initializations?
 
