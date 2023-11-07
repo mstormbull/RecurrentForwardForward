@@ -24,7 +24,6 @@ from RecurrentFF.util import (
     TrainLabelData,
     TrainTestBridgeFormatLoader,
     layer_activations_to_badness,
-    scale_labels_by_timestep_train,
 )
 from RecurrentFF.settings import (
     Settings,
@@ -37,15 +36,15 @@ class StableStateNetworkActivations:
         self.network_activations = activations
 
     def retrieve_random_stable_state_activations(self, batch_size: int):
-        # batch_index = random.randint(
-        #     0, self.network_activations.shape[0] - 1)
-        batch_index = 0
+        batch_index = random.randint(
+            0, self.network_activations.shape[0] - 1)
+        # batch_index = 0
         return self.network_activations[batch_index].detach().clone().unsqueeze(0).repeat(batch_size, 1)
 
 
 def generate_activation_initialization_samples(train_loader: torch.utils.data.DataLoader, processor: StaticSingleClassProcessor, inner_layers: InnerLayers, settings: Settings):
 
-    def generate_stable_states(batch_size: int, settings: Settings, forward_mode: ForwardMode):
+    def generate_stable_states(batch_size: int, settings: Settings):
         # get the dimensions of a data sample
         (train_input_data, train_label_data) = next(iter(train_loader))
         data_sample_size = train_input_data.pos_input[0][0].size()
@@ -64,17 +63,12 @@ def generate_activation_initialization_samples(train_loader: torch.utils.data.Da
         for _preinit_step in range(
                 0, 1000):
             inner_layers.advance_layers_forward(
-                forward_mode, noise, preinit_upper_clamped_tensor, False)
-
-        # TODO: confirm stable state with debugging
+                ForwardMode.PositiveData, noise, preinit_upper_clamped_tensor, False)
 
         # return the stable state activations
         activations = []
         for layer in inner_layers:
-            if forward_mode == ForwardMode.PositiveData:
-                activations.append(layer.pos_activations.current)
-            else:
-                activations.append(layer.predict_activations.current)
+            activations.append(layer.pos_activations.current)
 
         # network activations of shape (layer, batch, representation)
         activations = torch.stack(activations, dim=1)
@@ -92,17 +86,12 @@ def generate_activation_initialization_samples(train_loader: torch.utils.data.Da
 
     for layer in inner_layers:
         layer.reset_activations(True)
-    train_stable_state_network_activations = generate_stable_states(
-        settings.data_config.train_batch_size, settings, ForwardMode.PositiveData)
-
-    for layer in inner_layers:
-        layer.reset_activations(False)
-    predict_stable_state_network_activations = generate_stable_states(
-        settings.data_config.test_batch_size, settings, ForwardMode.PredictData)
+    stable_state_network_activations = generate_stable_states(
+        settings.data_config.train_batch_size, settings)
 
     logging.info("Finished generating stable state network activations")
 
-    return train_stable_state_network_activations, predict_stable_state_network_activations
+    return stable_state_network_activations
 
 
 # TODO: try use separate optimizer for lateral connections
@@ -193,12 +182,10 @@ class RecurrentFFNet(nn.Module):
                 write_activations=write_activations)
 
     def attach_stable_state_preinitializations(self, train_loader: torch.utils.data.DataLoader) -> None:
-        train_stable_state_activations, predict_stable_state_activations = generate_activation_initialization_samples(
+        stable_state_activations = generate_activation_initialization_samples(
             train_loader, self.processor, self.inner_layers, self.settings)
         for i, layer in enumerate(self.inner_layers):
-            layer.train_stable_state_activations = train_stable_state_activations[
-                i]
-            layer.predict_stable_state_activations = predict_stable_state_activations[
+            layer.stable_state_activations = stable_state_activations[
                 i]
 
     @profile(stdout=False, filename='baseline.prof',
@@ -235,11 +222,12 @@ class RecurrentFFNet(nn.Module):
         for epoch in range(0, self.settings.model.epochs):
             logging.info("Epoch: " + str(epoch))
 
-            # self.attach_stable_state_preinitializations(train_loader)
-
             # TODO: if epoch mod something == 0, rebuild potential hidden state initializations?
 
             for batch_num, (input_data, label_data) in enumerate(train_loader):
+                if batch_num % 200 == 0:
+                    self.attach_stable_state_preinitializations(train_loader)
+
                 input_data.move_to_device_inplace(self.settings.device.device)
                 label_data.move_to_device_inplace(self.settings.device.device)
 

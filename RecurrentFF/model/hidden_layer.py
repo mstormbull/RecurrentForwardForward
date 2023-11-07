@@ -130,8 +130,7 @@ class HiddenLayer(nn.Module):
         self.neg_activations: Optional[Activations] = None
         self.predict_activations: Optional[Activations] = None
 
-        self.train_stable_state_activations: Optional[torch.Tensor] = None
-        self.predict_stable_state_activations: Optional[torch.Tensor] = None
+        self.stable_state_activations: Optional[torch.Tensor] = None
 
         self.reset_activations(True)
 
@@ -237,10 +236,7 @@ class HiddenLayer(nn.Module):
         if isTraining:
             activations_dim = self.train_activations_dim
 
-            # TODO: remove
-            assert self.training_stable_state_activations is None
-
-            if self.train_stable_state_activations is None:
+            if self.stable_state_activations is None:
                 pos_activations_current = torch.zeros(
                     activations_dim[0], activations_dim[1]).to(
                     self.settings.device.device)
@@ -254,19 +250,10 @@ class HiddenLayer(nn.Module):
                     activations_dim[0], activations_dim[1]).to(
                     self.settings.device.device)
 
-                nn.init.orthogonal_(
-                    self.pos_activations_current, gain=math.sqrt(2))
-                nn.init.orthogonal_(
-                    self.pos_activations_previous, gain=math.sqrt(2))
-                nn.init.orthogonal_(
-                    self.neg_activations_current, gain=math.sqrt(2))
-                nn.init.orthogonal_(
-                    self.neg_activations_previous, gain=math.sqrt(2))
-
             else:
-                pos_activations_stable_state = self.train_stable_state_activations.retrieve_random_stable_state_activations(
+                pos_activations_stable_state = self.stable_state_activations.retrieve_random_stable_state_activations(
                     self.settings.data_config.train_batch_size)
-                neg_activations_stable_state = self.train_stable_state_activations.retrieve_random_stable_state_activations(
+                neg_activations_stable_state = self.stable_state_activations.retrieve_random_stable_state_activations(
                     self.settings.data_config.train_batch_size)
                 pos_activations_current = pos_activations_stable_state.clone()
                 pos_activations_previous = pos_activations_stable_state.clone()
@@ -282,22 +269,15 @@ class HiddenLayer(nn.Module):
         else:
             activations_dim = self.test_activations_dim
 
-            # TODO: remove
-            assert self.training_stable_state_activations is None
-
-            if self.predict_stable_state_activations is None:
+            if self.stable_state_activations is None:
                 predict_activations_current = torch.zeros(
                     activations_dim[0], activations_dim[1]).to(
                     self.settings.device.device)
                 predict_activations_previous = torch.zeros(
                     activations_dim[0], activations_dim[1]).to(
                     self.settings.device.device)
-                nn.init.orthogonal_(
-                    self.predict_activations_current, gain=math.sqrt(2))
-                nn.init.orthogonal_(
-                    self.predict_activations_previous, gain=math.sqrt(2))
             else:
-                activations_stable_state = self.predict_stable_state_activations.retrieve_random_stable_state_activations(
+                activations_stable_state = self.stable_state_activations.retrieve_random_stable_state_activations(
                     self.settings.data_config.test_batch_size)
                 predict_activations_current = activations_stable_state.clone()
                 predict_activations_previous = activations_stable_state.clone()
