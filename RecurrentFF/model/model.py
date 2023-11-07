@@ -193,7 +193,7 @@ class RecurrentFFNet(nn.Module):
                 is_test_set=True,
                 write_activations=write_activations)
 
-    def generate_stable_state_preinitializations(self, train_loader: torch.utils.data.DataLoader) -> None:
+    def attach_stable_state_preinitializations(self, train_loader: torch.utils.data.DataLoader) -> None:
         train_stable_state_activations, predict_stable_state_activations = generate_activation_initialization_samples(
             train_loader, self.processor, self.inner_layers, self.settings)
         for i, layer in enumerate(self.inner_layers):
