@@ -36,58 +36,46 @@ class StableStateNetworkActivations:
         self.network_activations = activations
 
     def retrieve_random_stable_state_activations(self, batch_size: int):
-        batch_index = random.randint(
-            0, self.network_activations.shape[0] - 1)
-        # batch_index = 0
+        # batch_index = random.randint(
+        #     0, self.network_activations.shape[0] - 1)
+        batch_index = 0
         return self.network_activations[batch_index].detach().clone().unsqueeze(0).repeat(batch_size, 1)
 
 
-def generate_activation_initialization_samples(train_loader: torch.utils.data.DataLoader, processor: StaticSingleClassProcessor, inner_layers: InnerLayers, settings: Settings):
-
-    def generate_stable_states(batch_size: int, settings: Settings):
-        # get the dimensions of a data sample
-        (train_input_data, train_label_data) = next(iter(train_loader))
-        data_sample_size = train_input_data.pos_input[0][0].size()
-        label_sample_shape = (batch_size, settings.data_config.num_classes)
-
-        # generate noise of these dimensions (1000 samples)
-        noise = torch.randn(
-            batch_size,
-            data_sample_size[0]).to(settings.device.device)
-
-        # generate equally weighted labels
-        preinit_upper_clamped_tensor = processor.get_preinit_upper_clamped_tensor(
-            label_sample_shape)
-
-        # run the network on the noise for timesteps until stable state
-        for _preinit_step in range(
-                0, 1000):
-            inner_layers.advance_layers_forward(
-                ForwardMode.PositiveData, noise, preinit_upper_clamped_tensor, False)
-
-        # return the stable state activations
-        activations = []
-        for layer in inner_layers:
-            activations.append(layer.pos_activations.current)
-
-        # network activations of shape (layer, batch, representation)
-        activations = torch.stack(activations, dim=1)
-
-        # iterate through activations layer dim and create StableStateNetworkActivations
-        stable_state_network_activations = []
-        for layer_index in range(0, activations.shape[0]):
-            stable_state_network_activations.append(
-                StableStateNetworkActivations(activations[layer_index]))
-
-        return stable_state_network_activations
-
+def generate_activation_initialization_samples(noise: torch.Tensor, processor: StaticSingleClassProcessor, inner_layers: InnerLayers, settings: Settings):
     logging.info(
         "Generating stable state network activations for training and prediction")
 
     for layer in inner_layers:
         layer.reset_activations(True)
-    stable_state_network_activations = generate_stable_states(
-        settings.data_config.train_batch_size, settings)
+
+    label_sample_shape = (settings.data_config.train_batch_size,
+                          settings.data_config.num_classes)
+
+    # generate equally weighted labels
+    preinit_upper_clamped_tensor = processor.get_preinit_upper_clamped_tensor(
+        label_sample_shape)
+
+    # run the network on the noise for timesteps until stable state
+    print(noise)
+    for _preinit_step in range(
+            0, 1000):
+        inner_layers.advance_layers_forward(
+            ForwardMode.PositiveData, noise, preinit_upper_clamped_tensor, False)
+
+    # return the stable state activations
+    activations = []
+    for layer in inner_layers:
+        activations.append(layer.pos_activations.current)
+
+    # network activations of shape (layer, batch, representation)
+    activations = torch.stack(activations, dim=1)
+
+    # iterate through activations layer dim and create StableStateNetworkActivations
+    stable_state_network_activations = []
+    for layer_index in range(0, activations.shape[0]):
+        stable_state_network_activations.append(
+            StableStateNetworkActivations(activations[layer_index]))
 
     logging.info("Finished generating stable state network activations")
 
@@ -166,6 +154,10 @@ class RecurrentFFNet(nn.Module):
             "_" + datetime.now().strftime("%Y-%m-%d_%H-%M-%S") + "_" + ''.join(
                 random.choices(string.ascii_uppercase + string.digits, k=6)) + ".pth"
 
+        self.noise = torch.randn(
+            1,
+            self.settings.data_config.data_size).to(settings.device.device)
+
         logging.info("Finished initializing network")
 
     def predict(
@@ -181,9 +173,9 @@ class RecurrentFFNet(nn.Module):
                 is_test_set=True,
                 write_activations=write_activations)
 
-    def attach_stable_state_preinitializations(self, train_loader: torch.utils.data.DataLoader) -> None:
+    def attach_stable_state_preinitializations(self) -> None:
         stable_state_activations = generate_activation_initialization_samples(
-            train_loader, self.processor, self.inner_layers, self.settings)
+            self.noise, self.processor, self.inner_layers, self.settings)
         for i, layer in enumerate(self.inner_layers):
             layer.stable_state_activations = stable_state_activations[
                 i]
@@ -222,12 +214,9 @@ class RecurrentFFNet(nn.Module):
         for epoch in range(0, self.settings.model.epochs):
             logging.info("Epoch: " + str(epoch))
 
-            # TODO: if epoch mod something == 0, rebuild potential hidden state initializations?
+            self.attach_stable_state_preinitializations()
 
             for batch_num, (input_data, label_data) in enumerate(train_loader):
-                if batch_num % 200 == 0:
-                    self.attach_stable_state_preinitializations(train_loader)
-
                 input_data.move_to_device_inplace(self.settings.device.device)
                 label_data.move_to_device_inplace(self.settings.device.device)
 
