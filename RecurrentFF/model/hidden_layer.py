@@ -22,6 +22,13 @@ from RecurrentFF.settings import (
 )
 
 
+def retrieve_random_stable_state_activations(network_activations: torch.Tensor, batch_size: int):
+    # batch_index = random.randint(
+    #     0, self.network_activations.shape[0] - 1)
+    batch_index = 0
+    return network_activations[batch_index].detach().clone().unsqueeze(0).repeat(batch_size, 1)
+
+
 def custom_load_state_dict(self, state_dict: Dict, strict=True):  # type: ignore
     # This function is a replication of the original PyTorch load_state_dict logic
     # with a check to prevent infinite recursion through the linked layers.
@@ -130,7 +137,9 @@ class HiddenLayer(nn.Module):
         self.neg_activations: Optional[Activations] = None
         self.predict_activations: Optional[Activations] = None
 
-        self.stable_state_activations: Optional[torch.Tensor] = None
+        self.register_buffer('stable_state_activations', torch.zeros(
+            1, size).to(self.settings.device.device))
+        # self.stable_state_activations: Optional[torch.Tensor] = None
 
         self.reset_activations(True)
 
@@ -236,7 +245,7 @@ class HiddenLayer(nn.Module):
         if isTraining:
             activations_dim = self.train_activations_dim
 
-            if self.stable_state_activations is None:
+            if torch.equal(self.stable_state_activations, torch.zeros(1, 1).to(self.settings.device.device)):
                 pos_activations_current = torch.zeros(
                     activations_dim[0], activations_dim[1]).to(
                     self.settings.device.device)
@@ -251,10 +260,10 @@ class HiddenLayer(nn.Module):
                     self.settings.device.device)
 
             else:
-                pos_activations_stable_state = self.stable_state_activations.retrieve_random_stable_state_activations(
-                    self.settings.data_config.train_batch_size)
-                neg_activations_stable_state = self.stable_state_activations.retrieve_random_stable_state_activations(
-                    self.settings.data_config.train_batch_size)
+                pos_activations_stable_state = retrieve_random_stable_state_activations(self.stable_state_activations,
+                                                                                        self.settings.data_config.train_batch_size)
+                neg_activations_stable_state = retrieve_random_stable_state_activations(self.stable_state_activations,
+                                                                                        self.settings.data_config.train_batch_size)
                 pos_activations_current = pos_activations_stable_state.clone()
                 pos_activations_previous = pos_activations_stable_state.clone()
                 neg_activations_current = neg_activations_stable_state.clone()
@@ -269,7 +278,7 @@ class HiddenLayer(nn.Module):
         else:
             activations_dim = self.test_activations_dim
 
-            if self.stable_state_activations is None:
+            if torch.equal(self.stable_state_activations, torch.zeros(1, 1).to(self.settings.device.device)):
                 predict_activations_current = torch.zeros(
                     activations_dim[0], activations_dim[1]).to(
                     self.settings.device.device)
@@ -277,8 +286,8 @@ class HiddenLayer(nn.Module):
                     activations_dim[0], activations_dim[1]).to(
                     self.settings.device.device)
             else:
-                activations_stable_state = self.stable_state_activations.retrieve_random_stable_state_activations(
-                    self.settings.data_config.test_batch_size)
+                activations_stable_state = retrieve_random_stable_state_activations(self.stable_state_activations,
+                                                                                    self.settings.data_config.test_batch_size)
                 predict_activations_current = activations_stable_state.clone()
                 predict_activations_previous = activations_stable_state.clone()
 

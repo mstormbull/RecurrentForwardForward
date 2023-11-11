@@ -30,18 +30,6 @@ from RecurrentFF.settings import (
 )
 
 
-class StableStateNetworkActivations:
-    def __init__(self, activations: torch.Tensor) -> Self:
-        # activations of shape (batch, representation)
-        self.network_activations = activations
-
-    def retrieve_random_stable_state_activations(self, batch_size: int):
-        # batch_index = random.randint(
-        #     0, self.network_activations.shape[0] - 1)
-        batch_index = 0
-        return self.network_activations[batch_index].detach().clone().unsqueeze(0).repeat(batch_size, 1)
-
-
 def generate_activation_initialization_samples(noise: torch.Tensor, processor: StaticSingleClassProcessor, inner_layers: InnerLayers, settings: Settings):
     logging.info(
         "Generating stable state network activations for training and prediction")
@@ -65,16 +53,23 @@ def generate_activation_initialization_samples(noise: torch.Tensor, processor: S
     # return the stable state activations
     activations = []
     for layer in inner_layers:
-        activations.append(layer.pos_activations.current)
+        activations.append(layer.pos_activations.current[0].unsqueeze(0))
 
     # network activations of shape (layer, batch, representation)
     activations = torch.stack(activations, dim=0)
+
+    print(activations.shape)
+    input("weird")
 
     # iterate through activations layer dim and create StableStateNetworkActivations
     stable_state_network_activations = []
     for layer_index in range(0, activations.shape[0]):
         stable_state_network_activations.append(
-            StableStateNetworkActivations(activations[layer_index]))
+            activations[layer_index])
+        if layer_index == 0:
+            print("------------printing layer 0 activations")
+            print(activations[layer_index][0:8])
+            print("////------------printing layer 0 activations")
 
     logging.info("Finished generating stable state network activations")
 
@@ -156,6 +151,8 @@ class RecurrentFFNet(nn.Module):
         self.noise = torch.randn(
             self.settings.data_config.train_batch_size,
             self.settings.data_config.data_size).to(settings.device.device)
+        print(self.noise[0][0:5])
+        input()
 
         logging.info("Finished initializing network")
 
@@ -258,6 +255,8 @@ class RecurrentFFNet(nn.Module):
 
             self.inner_layers.step_learning_rates()
 
+            input()
+
     def __train_batch(
             self,
             batch_num: int,
@@ -267,6 +266,12 @@ class RecurrentFFNet(nn.Module):
         logging.info("Batch: " + str(batch_num))
 
         self.inner_layers.reset_activations(True)
+        if batch_num == 0:
+            for layer in self.inner_layers:
+                print(layer.pos_activations.current.shape)
+                print(layer.pos_activations.current)
+            print("press to cont.")
+            input()
 
         for preinit_step in range(0, self.settings.model.prelabel_timesteps):
             logging.debug("Preinitialization step: " +
