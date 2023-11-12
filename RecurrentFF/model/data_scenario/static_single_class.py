@@ -384,19 +384,6 @@ class StaticSingleClassProcessor(DataScenarioProcessor):
         accuracy_contexts = []
 
         for batch, test_data in enumerate(loader):
-            self.inner_layers.reset_activations(not is_test_set)
-            print("----------------printing layer activations----------")
-            for layer in self.inner_layers:
-                if is_test_set:
-                    print(layer.predict_activations.current.shape)
-                    print(layer.predict_activations.current[0][0:5])
-                else:
-                    print(layer.pos_activations.current.shape)
-                    print(layer.pos_activations.current[0][0:5])
-
-            print("////----------------printing layer activations----------")
-            print("press to cont.")
-            input()
 
             if limit_batches is not None and batch == limit_batches:
                 break

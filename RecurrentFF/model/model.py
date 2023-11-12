@@ -58,18 +58,11 @@ def generate_activation_initialization_samples(noise: torch.Tensor, processor: S
     # network activations of shape (layer, batch, representation)
     activations = torch.stack(activations, dim=0)
 
-    print(activations.shape)
-    input("weird")
-
     # iterate through activations layer dim and create StableStateNetworkActivations
     stable_state_network_activations = []
     for layer_index in range(0, activations.shape[0]):
         stable_state_network_activations.append(
             activations[layer_index])
-        if layer_index == 0:
-            print("------------printing layer 0 activations")
-            print(activations[layer_index][0:8])
-            print("////------------printing layer 0 activations")
 
     logging.info("Finished generating stable state network activations")
 
@@ -151,8 +144,6 @@ class RecurrentFFNet(nn.Module):
         self.noise = torch.randn(
             self.settings.data_config.train_batch_size,
             self.settings.data_config.data_size).to(settings.device.device)
-        print(self.noise[0][0:5])
-        input()
 
         logging.info("Finished initializing network")
 
@@ -210,9 +201,10 @@ class RecurrentFFNet(nn.Module):
         for epoch in range(0, self.settings.model.epochs):
             logging.info("Epoch: " + str(epoch))
 
-            self.attach_stable_state_preinitializations()
-
             for batch_num, (input_data, label_data) in enumerate(train_loader):
+                if batch_num % 10 == 0:
+                    self.attach_stable_state_preinitializations()
+
                 input_data.move_to_device_inplace(self.settings.device.device)
                 label_data.move_to_device_inplace(self.settings.device.device)
 
@@ -255,8 +247,6 @@ class RecurrentFFNet(nn.Module):
 
             self.inner_layers.step_learning_rates()
 
-            input()
-
     def __train_batch(
             self,
             batch_num: int,
@@ -266,12 +256,6 @@ class RecurrentFFNet(nn.Module):
         logging.info("Batch: " + str(batch_num))
 
         self.inner_layers.reset_activations(True)
-        if batch_num == 0:
-            for layer in self.inner_layers:
-                print(layer.pos_activations.current.shape)
-                print(layer.pos_activations.current)
-            print("press to cont.")
-            input()
 
         for preinit_step in range(0, self.settings.model.prelabel_timesteps):
             logging.debug("Preinitialization step: " +

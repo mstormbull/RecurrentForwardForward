@@ -10,7 +10,7 @@ from RecurrentFF.settings import Settings, DataConfig
 TEST_BATCH_SIZE = 1
 NUM_BATCHES = 1000
 
-WEIGHTS_PATH = "/home/andrew/Documents/projects/RecurrentForwardForward-search/MNIST_2023-11-10_17-38-08_JVGZ8E.pth"
+WEIGHTS_PATH = "/home/andrew/Documents/projects/RecurrentForwardForward-search/MNIST_2023-11-10_17-50-36_DHVT12.pth"
 
 if __name__ == "__main__":
     settings = Settings.new()
