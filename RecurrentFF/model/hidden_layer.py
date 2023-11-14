@@ -245,6 +245,7 @@ class HiddenLayer(nn.Module):
         if isTraining:
             activations_dim = self.train_activations_dim
 
+            # TODO: remove
             if torch.equal(self.stable_state_activations, torch.zeros(1, 1).to(self.settings.device.device)):
                 pos_activations_current = torch.zeros(
                     activations_dim[0], activations_dim[1]).to(
@@ -278,6 +279,7 @@ class HiddenLayer(nn.Module):
         else:
             activations_dim = self.test_activations_dim
 
+            # TODO: remove
             if torch.equal(self.stable_state_activations, torch.zeros(1, 1).to(self.settings.device.device)):
                 predict_activations_current = torch.zeros(
                     activations_dim[0], activations_dim[1]).to(

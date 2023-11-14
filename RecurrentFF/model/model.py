@@ -143,7 +143,7 @@ class RecurrentFFNet(nn.Module):
 
         self.noise = torch.randn(
             self.settings.data_config.train_batch_size,
-            self.settings.data_config.data_size).to(settings.device.device)
+            self.settings.data_config.data_size).to(settings.device.device) / 7
 
         logging.info("Finished initializing network")
 
@@ -201,9 +201,9 @@ class RecurrentFFNet(nn.Module):
         for epoch in range(0, self.settings.model.epochs):
             logging.info("Epoch: " + str(epoch))
 
+            self.attach_stable_state_preinitializations()
+
             for batch_num, (input_data, label_data) in enumerate(train_loader):
-                if batch_num % 10 == 0:
-                    self.attach_stable_state_preinitializations()
 
                 input_data.move_to_device_inplace(self.settings.device.device)
                 label_data.move_to_device_inplace(self.settings.device.device)
