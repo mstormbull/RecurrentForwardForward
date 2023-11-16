@@ -143,7 +143,7 @@ class RecurrentFFNet(nn.Module):
 
         self.noise = torch.randn(
             self.settings.data_config.train_batch_size,
-            self.settings.data_config.data_size).to(settings.device.device) / 7
+            self.settings.data_config.data_size).to(settings.device.device) / 100
 
         logging.info("Finished initializing network")
 
