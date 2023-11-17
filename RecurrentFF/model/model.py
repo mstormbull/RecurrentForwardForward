@@ -3,7 +3,7 @@ from datetime import datetime
 import logging
 import random
 import string
-from typing import List, Self, Tuple, cast
+from typing import List, Tuple, cast
 
 import torch
 from torch import nn
