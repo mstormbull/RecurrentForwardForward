@@ -46,7 +46,7 @@ def generate_activation_initialization_samples(noise: torch.Tensor, processor: S
 
     # run the network on the noise for timesteps until stable state
     for _preinit_step in range(
-            0, 30):
+            0, 1000):
         inner_layers.advance_layers_forward(
             ForwardMode.PositiveData, noise, preinit_upper_clamped_tensor, False)
 
@@ -104,6 +104,10 @@ class RecurrentFFNet(nn.Module):
 
         self.settings = settings
 
+        self.noise = torch.randn(
+            1,
+            self.settings.data_config.data_size).to(settings.device.device).repeat(self.settings.data_config.train_batch_size, 1) / 250
+
         inner_layers = nn.ModuleList()
         prev_size = self.settings.data_config.data_size
         for i, size in enumerate(self.settings.model.hidden_sizes):
@@ -135,16 +139,11 @@ class RecurrentFFNet(nn.Module):
         # when we eventually support changing/multiclass scenarios this will be
         # configurable
         self.processor = StaticSingleClassProcessor(
-            self.inner_layers, self.settings)
+            self.inner_layers, self.settings, self.noise)
 
         self.weights_file_name = self.settings.data_config.dataset + \
             "_" + datetime.now().strftime("%Y-%m-%d_%H-%M-%S") + "_" + ''.join(
                 random.choices(string.ascii_uppercase + string.digits, k=6)) + ".pth"
-
-        # TODO: add this to the image on training
-        self.noise = torch.randn(
-            self.settings.data_config.train_batch_size,
-            self.settings.data_config.data_size).to(settings.device.device) / 1000
 
         logging.info("Finished initializing network")
 
@@ -202,12 +201,22 @@ class RecurrentFFNet(nn.Module):
         for epoch in range(0, self.settings.model.epochs):
             logging.info("Epoch: " + str(epoch))
 
-            # self.attach_stable_state_preinitializations()
+            self.attach_stable_state_preinitializations()
 
             for batch_num, (input_data, label_data) in enumerate(train_loader):
-
                 input_data.move_to_device_inplace(self.settings.device.device)
                 label_data.move_to_device_inplace(self.settings.device.device)
+
+                broadcasted_noise = self.noise.unsqueeze(0).expand(
+                    self.settings.data_config.iterations, -1, -1)
+
+                input_data.pos_input += broadcasted_noise
+                input_data.neg_input += broadcasted_noise
+
+                # print(input_data.pos_input.shape)
+                # print(input_data.neg_input.shape)
+                # print(broadcasted_noise.shape)
+                # input()
 
                 if self.settings.model.should_replace_neg_data:
                     self.processor.replace_negative_data_inplace(
