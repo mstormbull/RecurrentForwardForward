@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 DATAFRAME_PATH = "./converted_data.parquet"
-FILTER_CLASS = 1
+FILTER_CLASS = 3
 
 # Load the parquet file
 df = pd.read_parquet(DATAFRAME_PATH)

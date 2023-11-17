@@ -245,30 +245,14 @@ class HiddenLayer(nn.Module):
         if isTraining:
             activations_dim = self.train_activations_dim
 
-            # TODO: remove
-            if torch.equal(self.stable_state_activations, torch.zeros(1, 1).to(self.settings.device.device)):
-                pos_activations_current = torch.zeros(
-                    activations_dim[0], activations_dim[1]).to(
-                    self.settings.device.device)
-                pos_activations_previous = torch.zeros(
-                    activations_dim[0], activations_dim[1]).to(
-                    self.settings.device.device)
-                neg_activations_current = torch.zeros(
-                    activations_dim[0], activations_dim[1]).to(
-                    self.settings.device.device)
-                neg_activations_previous = torch.zeros(
-                    activations_dim[0], activations_dim[1]).to(
-                    self.settings.device.device)
-
-            else:
-                pos_activations_stable_state = retrieve_random_stable_state_activations(self.stable_state_activations,
-                                                                                        self.settings.data_config.train_batch_size)
-                neg_activations_stable_state = retrieve_random_stable_state_activations(self.stable_state_activations,
-                                                                                        self.settings.data_config.train_batch_size)
-                pos_activations_current = pos_activations_stable_state.clone()
-                pos_activations_previous = pos_activations_stable_state.clone()
-                neg_activations_current = neg_activations_stable_state.clone()
-                neg_activations_previous = neg_activations_stable_state.clone()
+            pos_activations_stable_state = retrieve_random_stable_state_activations(self.stable_state_activations,
+                                                                                    self.settings.data_config.train_batch_size)
+            neg_activations_stable_state = retrieve_random_stable_state_activations(self.stable_state_activations,
+                                                                                    self.settings.data_config.train_batch_size)
+            pos_activations_current = pos_activations_stable_state.clone()
+            pos_activations_previous = pos_activations_stable_state.clone()
+            neg_activations_current = neg_activations_stable_state.clone()
+            neg_activations_previous = neg_activations_stable_state.clone()
 
             self.pos_activations = Activations(
                 pos_activations_current, pos_activations_previous)
@@ -279,19 +263,10 @@ class HiddenLayer(nn.Module):
         else:
             activations_dim = self.test_activations_dim
 
-            # TODO: remove
-            if torch.equal(self.stable_state_activations, torch.zeros(1, 1).to(self.settings.device.device)):
-                predict_activations_current = torch.zeros(
-                    activations_dim[0], activations_dim[1]).to(
-                    self.settings.device.device)
-                predict_activations_previous = torch.zeros(
-                    activations_dim[0], activations_dim[1]).to(
-                    self.settings.device.device)
-            else:
-                activations_stable_state = retrieve_random_stable_state_activations(self.stable_state_activations,
-                                                                                    self.settings.data_config.test_batch_size)
-                predict_activations_current = activations_stable_state.clone()
-                predict_activations_previous = activations_stable_state.clone()
+            activations_stable_state = retrieve_random_stable_state_activations(self.stable_state_activations,
+                                                                                self.settings.data_config.test_batch_size)
+            predict_activations_current = activations_stable_state.clone()
+            predict_activations_previous = activations_stable_state.clone()
 
             self.predict_activations = Activations(
                 predict_activations_current, predict_activations_previous)

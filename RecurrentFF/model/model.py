@@ -46,7 +46,7 @@ def generate_activation_initialization_samples(noise: torch.Tensor, processor: S
 
     # run the network on the noise for timesteps until stable state
     for _preinit_step in range(
-            0, 1000):
+            0, 30):
         inner_layers.advance_layers_forward(
             ForwardMode.PositiveData, noise, preinit_upper_clamped_tensor, False)
 
@@ -141,9 +141,10 @@ class RecurrentFFNet(nn.Module):
             "_" + datetime.now().strftime("%Y-%m-%d_%H-%M-%S") + "_" + ''.join(
                 random.choices(string.ascii_uppercase + string.digits, k=6)) + ".pth"
 
+        # TODO: add this to the image on training
         self.noise = torch.randn(
             self.settings.data_config.train_batch_size,
-            self.settings.data_config.data_size).to(settings.device.device) / 100
+            self.settings.data_config.data_size).to(settings.device.device) / 1000
 
         logging.info("Finished initializing network")
 
@@ -201,7 +202,7 @@ class RecurrentFFNet(nn.Module):
         for epoch in range(0, self.settings.model.epochs):
             logging.info("Epoch: " + str(epoch))
 
-            self.attach_stable_state_preinitializations()
+            # self.attach_stable_state_preinitializations()
 
             for batch_num, (input_data, label_data) in enumerate(train_loader):
 
