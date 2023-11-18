@@ -3,7 +3,7 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 import numpy as np
 
-DATAFRAME_PATH = "./converted_data.parquet"
+DATAFRAME_PATH = "./converted_data_spike_elim_rescaled_2_250.parquet"
 FILTER_CLASS = 3
 
 # Load the parquet file
@@ -51,7 +51,7 @@ def plot_activations_l2_over_time_from_df(df):
         )
         g._legend.set_bbox_to_anchor((1.05, 0.5))
 
-        g.set(ylim=(0, 250))
+        g.set(ylim=(0, 80))
         g.set(xlim=(0, 25))
 
         # Enhancements
