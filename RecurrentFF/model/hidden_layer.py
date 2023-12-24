@@ -323,14 +323,31 @@ class HiddenLayer(nn.Module):
         # Loss function equivelent to:
         # plot3d log(1 + exp(-n + 1)) + log(1 + exp(p - 1)) for n=0 to 3, p=0
         # to 3
-        layer_loss: Tensor = F.softplus(torch.cat([
+        ff_layer_loss: Tensor = F.softplus(torch.cat([
             (-1 * neg_badness) + self.settings.model.loss_threshold,
             pos_badness - self.settings.model.loss_threshold
         ])).mean()
+
+        lpl_loss_predictive: Tensor = generate_lpl_loss_predictive()
+        lpl_loss_hebbian: Tensor = generate_lpl_loss_hebbian()
+        lpl_loss_decorrelative: Tensor = generate_lpl_loss_decorrelative()
+
+        layer_loss: Tensor = ff_layer_loss + lpl_loss_predictive + \
+            lpl_loss_hebbian + lpl_loss_decorrelative
+
         layer_loss.backward()
 
         self.optimizer.step()
         return cast(float, layer_loss.item())
+
+    def generate_lpl_loss_predictive(self) -> Tensor:
+        pass
+
+    def generate_lpl_loss_hebbian(self) -> Tensor:
+        pass
+
+    def generate_lpl_loss_decorrelative(self) -> Tensor:
+        pass
 
     # TODO: needs to be more DRY
     def forward(self, mode: ForwardMode, data: torch.Tensor, labels: torch.Tensor, should_damp: bool) -> torch.Tensor:
