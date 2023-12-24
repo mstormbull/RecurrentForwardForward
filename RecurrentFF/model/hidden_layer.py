@@ -328,9 +328,9 @@ class HiddenLayer(nn.Module):
             pos_badness - self.settings.model.loss_threshold
         ])).mean()
 
-        lpl_loss_predictive: Tensor = generate_lpl_loss_predictive()
-        lpl_loss_hebbian: Tensor = generate_lpl_loss_hebbian()
-        lpl_loss_decorrelative: Tensor = generate_lpl_loss_decorrelative()
+        lpl_loss_predictive: Tensor = self.generate_lpl_loss_predictive()
+        lpl_loss_hebbian: Tensor = self.generate_lpl_loss_hebbian()
+        lpl_loss_decorrelative: Tensor = self.generate_lpl_loss_decorrelative()
 
         layer_loss: Tensor = ff_layer_loss + lpl_loss_predictive + \
             lpl_loss_hebbian + lpl_loss_decorrelative
@@ -341,7 +341,20 @@ class HiddenLayer(nn.Module):
         return cast(float, layer_loss.item())
 
     def generate_lpl_loss_predictive(self) -> Tensor:
-        pass
+        def generate_loss(current_act: Tensor, previous_act: Tensor) -> Tensor:
+            loss = (current_act - previous_act.detach()) ** 2
+            loss = torch.sum(loss, dim=1)
+            loss = torch.sum(loss, dim=0)
+            loss = loss / \
+                (2 * current_act.shape[0] * current_act.shape[1])
+            return loss
+
+        pos_loss = generate_loss(
+            self.pos_activations.current, self.pos_activations.previous)
+        neg_loss = generate_loss(
+            self.neg_activations.current, self.neg_activations.previous)
+
+        return (pos_loss + neg_loss) // 2
 
     def generate_lpl_loss_hebbian(self) -> Tensor:
         pass
