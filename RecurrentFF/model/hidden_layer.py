@@ -328,9 +328,12 @@ class HiddenLayer(nn.Module):
             pos_badness - self.settings.model.loss_threshold
         ])).mean()
 
-        lpl_loss_predictive: Tensor = self.generate_lpl_loss_predictive()
-        lpl_loss_hebbian: Tensor = self.generate_lpl_loss_hebbian()
-        lpl_loss_decorrelative: Tensor = self.generate_lpl_loss_decorrelative()
+        lpl_loss_predictive: Tensor = self.settings.model.loss_scale_predictive * \
+            self.generate_lpl_loss_predictive()
+        lpl_loss_hebbian: Tensor = self.settings.model.loss_scale_hebbian * \
+            self.generate_lpl_loss_hebbian()
+        lpl_loss_decorrelative: Tensor = self.settings.model.loss_scale_decorrelative * \
+            self.generate_lpl_loss_decorrelative()
 
         layer_loss: Tensor = ff_layer_loss + lpl_loss_predictive + \
             lpl_loss_hebbian + lpl_loss_decorrelative
@@ -357,10 +360,45 @@ class HiddenLayer(nn.Module):
         return (pos_loss + neg_loss) // 2
 
     def generate_lpl_loss_hebbian(self) -> Tensor:
-        pass
+        def generate_loss(activations: Tensor) -> Tensor:
+            activations = activations.detach()
+            mean_act = torch.mean(activations, dim=0)
+
+            mean_subtracted = activations - mean_act.view(-1, 1)
+            sigma_squared = torch.sum(
+                mean_subtracted ** 2, dim=0) / (activations.shape[0] - 1)
+
+            loss = -torch.log(sigma_squared).sum() / sigma_squared.shape[0]
+            return loss
+
+        pos_loss = generate_loss(self.pos_activations.current)
+        neg_loss = generate_loss(self.neg_activations.current)
+
+        return (pos_loss + neg_loss) // 2
 
     def generate_lpl_loss_decorrelative(self) -> Tensor:
-        pass
+        def generate_loss(activations: Tensor) -> Tensor:
+            activations = activations.detach()
+            mean_act = torch.mean(activations, dim=0)
+
+            loss = 0
+            for b in range(activations.shape[0]):
+                for i in range(activations.shape[1]):
+                    for k in range(activations.shape[1]):
+                        if i == k:
+                            continue
+                        loss += (activations[b][i] - mean_act[i]) ** 2 * \
+                            (activations[b][k] - mean_act[k]) ** 2
+
+            loss = loss / \
+                (activations.shape[0] * activations.shape[1]
+                 * activations.shape[1])
+            return loss
+
+        pos_loss = generate_loss(self.pos_activations.current)
+        neg_loss = generate_loss(self.neg_activations.current)
+
+        return (pos_loss + neg_loss) // 2
 
     # TODO: needs to be more DRY
     def forward(self, mode: ForwardMode, data: torch.Tensor, labels: torch.Tensor, should_damp: bool) -> torch.Tensor:
