@@ -1,4 +1,6 @@
+import logging
 import math
+import random
 from typing import Dict, Optional, cast
 from typing_extensions import Self
 
@@ -335,6 +337,13 @@ class HiddenLayer(nn.Module):
         lpl_loss_decorrelative: Tensor = self.settings.model.loss_scale_decorrelative * \
             self.generate_lpl_loss_decorrelative()
 
+        if random.random() < 0.01:
+            print("ff_layer_loss: ", ff_layer_loss)
+            print("lpl_loss_predictive: ", lpl_loss_predictive)
+            print("lpl_loss_hebbian: ", lpl_loss_hebbian)
+            print("lpl_loss_decorrelative: ", lpl_loss_decorrelative)
+            print()
+
         layer_loss: Tensor = ff_layer_loss + lpl_loss_predictive + \
             lpl_loss_hebbian + lpl_loss_decorrelative
 
@@ -357,7 +366,7 @@ class HiddenLayer(nn.Module):
         neg_loss = generate_loss(
             self.neg_activations.current, self.neg_activations.previous)
 
-        return (pos_loss + neg_loss) // 2
+        return (pos_loss + neg_loss) / 2
 
     def generate_lpl_loss_hebbian(self) -> Tensor:
         def generate_loss(activations: Tensor) -> Tensor:
@@ -374,31 +383,56 @@ class HiddenLayer(nn.Module):
         pos_loss = generate_loss(self.pos_activations.current)
         neg_loss = generate_loss(self.neg_activations.current)
 
-        return (pos_loss + neg_loss) // 2
+        return (pos_loss + neg_loss) / 2
 
     def generate_lpl_loss_decorrelative(self) -> Tensor:
-        def generate_loss(activations: Tensor) -> Tensor:
+        def generate_loss(activations: torch.Tensor) -> torch.Tensor:
+            # Ensure activations are detached from the computation graph
             activations = activations.detach()
+
+            # Compute the mean across the batch dimension
             mean_act = torch.mean(activations, dim=0)
 
-            loss = 0
-            for b in range(activations.shape[0]):
-                for i in range(activations.shape[1]):
-                    for k in range(activations.shape[1]):
-                        if i == k:
-                            continue
-                        loss += (activations[b][i] - mean_act[i]) ** 2 * \
-                            (activations[b][k] - mean_act[k]) ** 2
+            # Subtract mean from activations and square the result
+            deviations = (activations - mean_act) ** 2
 
-            loss = loss / \
-                (activations.shape[0] * activations.shape[1]
-                 * activations.shape[1])
+            # Outer product along feature dimension for each batch
+            # This computes the pairwise squared differences efficiently
+            loss = torch.einsum('bi,bj->bij', deviations, deviations)
+
+            # Sum over all batches and features, exclude the diagonal elements
+            # Diagonal elements correspond to the squared terms which we want to avoid
+            batch_size, n_features = activations.shape
+            loss = torch.sum(loss) - \
+                torch.sum(torch.einsum('bii->b', loss)) / 2
+
+            # Normalize the loss
+            loss = loss / (batch_size * n_features * (n_features - 1))
+
             return loss
+
+        # def generate_loss(activations: Tensor) -> Tensor:
+        #     activations = activations.detach()
+        #     mean_act = torch.mean(activations, dim=0)
+
+        #     loss = 0
+        #     for b in range(activations.shape[0]):
+        #         for i in range(activations.shape[1]):
+        #             for k in range(activations.shape[1]):
+        #                 if i == k:
+        #                     continue
+        #                 loss += (activations[b][i] - mean_act[i]) ** 2 * \
+        #                     (activations[b][k] - mean_act[k]) ** 2
+
+        #     loss = loss / \
+        #         (activations.shape[0] * activations.shape[1]
+        #          * (activations.shape[1] - 1))
+        #     return loss
 
         pos_loss = generate_loss(self.pos_activations.current)
         neg_loss = generate_loss(self.neg_activations.current)
 
-        return (pos_loss + neg_loss) // 2
+        return (pos_loss + neg_loss) / 2
 
     # TODO: needs to be more DRY
     def forward(self, mode: ForwardMode, data: torch.Tensor, labels: torch.Tensor, should_damp: bool) -> torch.Tensor:
