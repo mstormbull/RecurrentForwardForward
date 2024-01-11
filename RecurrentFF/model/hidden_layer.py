@@ -10,6 +10,7 @@ from torch.nn import Module
 from torch.nn import functional as F
 from torch.optim import RMSprop, Adam, Adadelta, Optimizer
 from torch.optim.lr_scheduler import StepLR
+# from torchviz import make_dot
 
 from RecurrentFF.util import (
     Activations,
@@ -337,7 +338,7 @@ class HiddenLayer(nn.Module):
         lpl_loss_decorrelative: Tensor = self.settings.model.loss_scale_decorrelative * \
             self.generate_lpl_loss_decorrelative()
 
-        if random.random() < 0.01:
+        if random.random() < 0.005:
             print("ff_layer_loss: ", ff_layer_loss)
             print("lpl_loss_predictive: ", lpl_loss_predictive)
             print("lpl_loss_hebbian: ", lpl_loss_hebbian)
@@ -348,6 +349,10 @@ class HiddenLayer(nn.Module):
             lpl_loss_hebbian + lpl_loss_decorrelative
 
         layer_loss.backward()
+
+        # dot = make_dot(layer_loss, params=dict(self.named_parameters()))
+        # dot.render('computation_graph', format='png')
+        # input()
 
         self.optimizer.step()
         return cast(float, layer_loss.item())
@@ -370,10 +375,10 @@ class HiddenLayer(nn.Module):
 
     def generate_lpl_loss_hebbian(self) -> Tensor:
         def generate_loss(activations: Tensor) -> Tensor:
-            activations = activations.detach()
+            # activations = activations.detach()
             mean_act = torch.mean(activations, dim=0)
+            mean_subtracted = activations - mean_act
 
-            mean_subtracted = activations - mean_act.view(-1, 1)
             sigma_squared = torch.sum(
                 mean_subtracted ** 2, dim=0) / (activations.shape[0] - 1)
 
@@ -388,7 +393,7 @@ class HiddenLayer(nn.Module):
     def generate_lpl_loss_decorrelative(self) -> Tensor:
         def generate_loss(activations: torch.Tensor) -> torch.Tensor:
             # Ensure activations are detached from the computation graph
-            activations = activations.detach()
+            # activations = activations.detach()
 
             # Compute the mean across the batch dimension
             mean_act = torch.mean(activations, dim=0)
