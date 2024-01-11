@@ -9,12 +9,14 @@ from RecurrentFF.model.model import RecurrentFFNet
 from RecurrentFF.settings import DataConfig, Settings
 from RecurrentFF.util import set_logging
 
+EPOCHS = 1
 DATA_SIZE = 784
 NUM_CLASSES = 10
 TRAIN_BATCH_SIZE = 500
 TEST_BATCH_SIZE = 5000
+DATASET = "MNIST"
 
-DEVICE = "cuda"
+DEVICE = "mps"
 
 
 def run(settings: Settings):
@@ -57,32 +59,37 @@ def run(settings: Settings):
 if __name__ == "__main__":
     set_logging()
 
-    loss_thresholds = [0.75, 1, 1.25]
+    loss_thresholds = [1.5]
 
-    iterations = [10, 20]
+    iterations = [15]
 
-    hidden_sizes = [[2000, 2000, 2000], [
-        2000, 2000, 2000, 2000], [1000, 2000, 1000]]
+    hidden_sizes = [[500, 500, 500]]
 
     ff_act = ["relu"]
 
-    ff_optimizers = ["rmsprop", "adam"]
-    classifier_optimizers = ["rmsprop", "adam"]
+    ff_optimizers = ["rmsprop"]
+    classifier_optimizers = ["rmsprop"]
 
-    ff_rmsprop_momentums = [0.0, 0.2, 0.5, 0.7, 0.9]
-    ff_rmsprop_learning_rates = [0.00001, 0.00005, 0.0001, 0.0005]
-    classifier_rmsprop_momentums = [0.0, 0.2, 0.5, 0.7, 0.9]
-    classifier_rmsprop_learning_rates = [0.00001, 0.00005, 0.0001, 0.0005]
+    ff_rmsprop_momentums = [0.0]
+    ff_rmsprop_learning_rates = [
+        0.000001, 0.000005, 0.00001, 0.00005, 0.0001, 0.0005]
+    classifier_rmsprop_momentums = [0.0]
+    classifier_rmsprop_learning_rates = [0.0001]
 
-    ff_adam_learning_rates = [0.00001, 0.00005, 0.0001]
-    classifier_adam_learning_rates = [0.00001, 0.00005, 0.0001, 0.0005]
+    ff_adam_learning_rates = [0.00001]
+    classifier_adam_learning_rates = [0.00001]
 
-    ff_adadelta_learning_rates = [0.00001, 0.00005, 0.0001, 0.0005]
-    classifier_adadelta_learning_rates = [0.00001, 0.00005, 0.0001, 0.0005]
+    ff_adadelta_learning_rates = [0.00001]
+    classifier_adadelta_learning_rates = [0.00001]
 
-    train_batch_sizes = [200, 500, 1000, 2000]
-    densities = [1]
+    # train_batch_sizes = [100, 200, 500, 1000]
+    train_batch_sizes = [5000]
     damping_factors = [0.3, 0.4, 0.5, 0.6, 0.7]
+
+    loss_scale_ffs = [1, 3, 5, 8, 13, 21]
+    loss_scale_predictives = [1, 3, 5, 8, 13, 21]
+    loss_scale_hebbians = [1, 3, 5, 8, 13, 21]
+    loss_scale_decorrelatives = [1, 3, 5, 8, 13, 21]
 
     while True:
         # random hyperparams
@@ -105,8 +112,12 @@ if __name__ == "__main__":
         ff_adadelta_learning_rate = random.choice(ff_adadelta_learning_rates)
         classifier_adadelta_learning_rate = random.choice(
             classifier_adadelta_learning_rates)
-        density = random.choice(densities)
         damping_factor = random.choice(damping_factors)
+
+        loss_scale_ff = random.choice(loss_scale_ffs)
+        loss_scale_predictive = random.choice(loss_scale_predictives)
+        loss_scale_hebbian = random.choice(loss_scale_hebbians)
+        loss_scale_decorrelative = random.choice(loss_scale_decorrelatives)
 
         # construct settings
         settings = Settings.new()
@@ -114,6 +125,7 @@ if __name__ == "__main__":
         settings.device.device = DEVICE
 
         data_config = {
+            "dataset": DATASET,
             "data_size": DATA_SIZE,
             "num_classes": NUM_CLASSES,
             "train_batch_size": TRAIN_BATCH_SIZE,
@@ -127,12 +139,18 @@ if __name__ == "__main__":
         settings.data_config.iterations = iterations_
         settings.data_config.train_batch_size = train_batch_size
 
+        settings.model.epochs = EPOCHS
         settings.model.loss_threshold = loss_threshold
         settings.model.hidden_sizes = hidden_sizes_
         settings.model.ff_activation = act
         settings.model.ff_optimizer = ff_opt
         settings.model.classifier_optimizer = classifier_opt
         settings.model.damping_factor = damping_factor
+
+        settings.model.loss_scale_ff = loss_scale_ff
+        settings.model.loss_scale_predictive = loss_scale_predictive
+        settings.model.loss_scale_hebbian = loss_scale_hebbian
+        settings.model.loss_scale_decorrelative = loss_scale_decorrelative
 
         if ff_opt == "rmsprop":
             settings.model.ff_rmsprop.momentum = ff_rmsprop_momentum
@@ -159,5 +177,3 @@ if __name__ == "__main__":
         print("-----------", str(p.exitcode))
         if p.exitcode != 0:
             exit(1)
-
-        break

@@ -70,6 +70,7 @@ class Model(BaseModel):
     classifier_adam: ClassifierAdam
     classifier_adadelta: FfAdadelta
 
+    loss_scale_ff: float
     loss_scale_predictive: float
     loss_scale_hebbian: float
     loss_scale_decorrelative: float

@@ -330,6 +330,7 @@ class HiddenLayer(nn.Module):
             (-1 * neg_badness) + self.settings.model.loss_threshold,
             pos_badness - self.settings.model.loss_threshold
         ])).mean()
+        ff_layer_loss = self.settings.model.loss_scale_ff * ff_layer_loss
 
         lpl_loss_predictive: Tensor = self.settings.model.loss_scale_predictive * \
             self.generate_lpl_loss_predictive()
