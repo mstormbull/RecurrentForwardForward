@@ -9,7 +9,7 @@ from RecurrentFF.model.model import RecurrentFFNet
 from RecurrentFF.settings import DataConfig, Settings
 from RecurrentFF.util import set_logging
 
-EPOCHS = 10
+EPOCHS = 5
 DATA_SIZE = 784
 NUM_CLASSES = 10
 TRAIN_BATCH_SIZE = 500

@@ -377,7 +377,7 @@ class HiddenLayer(nn.Module):
     def generate_lpl_loss_hebbian(self) -> Tensor:
         def generate_loss(activations: Tensor) -> Tensor:
             # activations = activations.detach()
-            mean_act = torch.mean(activations, dim=0)
+            mean_act = torch.mean(activations, dim=0).detach()
             mean_subtracted = activations - mean_act
 
             sigma_squared = torch.sum(
