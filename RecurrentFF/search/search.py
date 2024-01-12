@@ -9,7 +9,7 @@ from RecurrentFF.model.model import RecurrentFFNet
 from RecurrentFF.settings import DataConfig, Settings
 from RecurrentFF.util import set_logging
 
-EPOCHS = 1
+EPOCHS = 10
 DATA_SIZE = 784
 NUM_CLASSES = 10
 TRAIN_BATCH_SIZE = 500
@@ -72,7 +72,7 @@ if __name__ == "__main__":
 
     ff_rmsprop_momentums = [0.0]
     ff_rmsprop_learning_rates = [
-        0.000001, 0.000005, 0.00001, 0.00005, 0.0001, 0.0005]
+        0.000001, 0.000005, 0.00001, 0.00005, 0.0001, 0.0005, 0.001]
     classifier_rmsprop_momentums = [0.0]
     classifier_rmsprop_learning_rates = [0.0001]
 
@@ -82,8 +82,7 @@ if __name__ == "__main__":
     ff_adadelta_learning_rates = [0.00001]
     classifier_adadelta_learning_rates = [0.00001]
 
-    # train_batch_sizes = [100, 200, 500, 1000]
-    train_batch_sizes = [5000]
+    train_batch_sizes = [100, 200, 500, 1000]
     damping_factors = [0.3, 0.4, 0.5, 0.6, 0.7]
 
     loss_scale_ffs = [1, 3, 5, 8, 13, 21]
