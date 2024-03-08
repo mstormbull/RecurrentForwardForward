@@ -417,24 +417,6 @@ class HiddenLayer(nn.Module):
 
             return loss
 
-        # def generate_loss(activations: Tensor) -> Tensor:
-        #     activations = activations.detach()
-        #     mean_act = torch.mean(activations, dim=0)
-
-        #     loss = 0
-        #     for b in range(activations.shape[0]):
-        #         for i in range(activations.shape[1]):
-        #             for k in range(activations.shape[1]):
-        #                 if i == k:
-        #                     continue
-        #                 loss += (activations[b][i] - mean_act[i]) ** 2 * \
-        #                     (activations[b][k] - mean_act[k]) ** 2
-
-        #     loss = loss / \
-        #         (activations.shape[0] * activations.shape[1]
-        #          * (activations.shape[1] - 1))
-        #     return loss
-
         pos_loss = generate_loss(self.pos_activations.current)
         neg_loss = generate_loss(self.neg_activations.current)
 
