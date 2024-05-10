@@ -3,7 +3,7 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 import numpy as np
 
-DATAFRAME_PATH = "./converted_data_926.parquet"
+DATAFRAME_PATH = "./converted_data_initial.parquet"
 FILTER_CLASS = 3
 
 # Load the parquet file

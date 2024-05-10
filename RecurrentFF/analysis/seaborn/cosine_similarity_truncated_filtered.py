@@ -5,8 +5,8 @@ from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.decomposition import PCA
 import seaborn as sns
 
-DATAFRAME_PATH = "./converted_data_926.parquet"
-FILTER_CLASS = 3
+DATAFRAME_PATH = "./converted_data_initial.parquet"
+FILTER_CLASS = 1
 
 BASIC_COMPARISONS = [
     ('forward_activation_component', 'backward_activation_component'),

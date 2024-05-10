@@ -3,8 +3,8 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 import numpy as np
 
-DATAFRAME_PATH = "./converted_data_spike_elim_rescaled_2_250.parquet"
-FILTER_CLASS = 3
+DATAFRAME_PATH = "./converted_data_initial.parquet"
+FILTER_CLASS = 1
 
 # Load the parquet file
 df = pd.read_parquet(DATAFRAME_PATH)
