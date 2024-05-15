@@ -1,4 +1,4 @@
-# hash:sha256:090ce926877f82c796197f2ccc03de0169a8a825e9a7af67ef2989b36425bade
+# hash:sha256:81e823bc11c3f89c3919d86603de33a4d76608f9cc11d76218f3ebb349c97a69
 ARG REGISTRY_HOST
 FROM $REGISTRY_HOST/codeocean/pytorch-tensorflow-jax:2.1
 
@@ -10,6 +10,9 @@ COPY git-askpass /
 
 RUN pip install -U --no-cache-dir \
     matplotlib==3.8.4 \
-    torchaudio==2.3.0 \
-    torchvision==0.18.0 \
+    profilehooks \
+    pydantic \
+    toml \
+    torchaudio \
+    torchvision \
     wandb==0.17.0
